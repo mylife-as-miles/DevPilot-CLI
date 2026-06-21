@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Agent Orchestrator"
+  short_description: "Controls DevPilot multi-skill research runs"
+  default_prompt: "Use $devpilot-agent-orchestrator to run an DevPilot-style research cycle with phase skills."

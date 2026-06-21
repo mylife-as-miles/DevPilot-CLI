@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Merge Evaluation"
+  short_description: "Guards DevPilot merges and evaluation splits"
+  default_prompt: "Use $devpilot-agent-merge-eval to protect B_test and evaluate DevPilot merge candidates."
