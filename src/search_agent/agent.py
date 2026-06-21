@@ -1,0 +1,146 @@
+"""Build a SearchAgent — a thin Agent specialization for related-work search."""
+
+from __future__ import annotations
+
+from typing import Any, TYPE_CHECKING
+
+from ..core.agent import Agent
+from ..core.config import AgentConfig
+from ..core.tools.web import WebSearchTool, WebVisitTool
+from .prompts import SEARCH_AGENT_SYSTEM_PROMPT
+
+if TYPE_CHECKING:
+    from ..core.llm.base import LLMProvider
+    from ..coordinator.config import CoordinatorConfig, SearchConfig
+
+
+_PROVIDER_NAME_BY_CLASS = {
+    "ClaudeProvider": "claude",
+    "OpenAICompatProvider": "openai",
+}
+
+
+def _maybe_override_provider(
+    provider: "LLMProvider",
+    meta_config: "CoordinatorConfig | None",
+    override_model: str | None,
+) -> "LLMProvider":
+    """Return a fresh provider on ``override_model`` if it differs from
+    ``provider``'s current model. Otherwise return ``provider`` unchanged.
+    """
+    if not override_model:
+        return provider
+    current = getattr(provider, "model", None)
+    if current == override_model:
+        return provider
+    if meta_config is None:
+        # We don't have api_key/base_url to build a new provider — fall back.
+        return provider
+    from ..core import create_provider as _create_provider
+
+    fresh_cfg = AgentConfig(
+        provider=meta_config.provider,
+        model=override_model,
+        api_key=meta_config.api_key,
+        base_url=meta_config.base_url,
+        openai_api=meta_config.openai_api,
+        reasoning_effort=meta_config.reasoning_effort,
+        reasoning_summary=meta_config.reasoning_summary,
+        text_verbosity=meta_config.text_verbosity,
+        parallel_tool_calls=meta_config.parallel_tool_calls,
+        thinking_budget_tokens=meta_config.thinking_budget_tokens,
+        llm_timeout=meta_config.llm_timeout,
+        llm_provider_retries=meta_config.llm_provider_retries,
+    )
+    return _create_provider(fresh_cfg)
+
+
+def build_search_agent(
+    *,
+    provider: "LLMProvider",
+    search_config: "SearchConfig",
+    cwd: str,
+    meta_config: "CoordinatorConfig | None" = None,
+    event_bus: Any | None = None,
+    max_tokens: int = 8192,
+    context_window: int = 200_000,
+) -> Agent:
+    """Construct a SearchAgent.
+
+    Parameters
+    ----------
+    provider:
+        LLM provider used for the agent loop. May be replaced internally by a
+        fresh provider on ``search_config.agent_model`` if that field is set
+        and differs (requires ``meta_config`` for api_key/base_url).
+    search_config:
+        ``SearchConfig`` from the coordinator. Must have ``web_search_endpoint``
+        set; ``web_browse_endpoint`` is recommended.
+    cwd:
+        Working directory.
+    meta_config:
+        Optional ``CoordinatorConfig`` — only consulted if a model override is
+        configured and a fresh provider needs to be built.
+    """
+    if not search_config.web_search_endpoint:
+        raise ValueError(
+            "build_search_agent requires search_config.web_search_endpoint "
+            "to be set. Configure WEB_SEARCH_ENDPOINT or the YAML "
+            "search.web_search_endpoint."
+        )
+
+    provider = _maybe_override_provider(
+        provider, meta_config, search_config.agent_model,
+    )
+
+    # AgentConfig.provider/model are only carried for logging / branch-naming.
+    provider_name = _PROVIDER_NAME_BY_CLASS.get(
+        provider.__class__.__name__, "claude"
+    )
+
+    agent_config = AgentConfig(
+        cwd=cwd,
+        provider=provider_name,
+        model=getattr(provider, "model", "claude-sonnet-4-20250514"),
+        max_tokens=max_tokens,
+        max_turns=search_config.agent_max_turns,
+        max_tool_concurrency=3,
+        context_window=context_window,
+        auto_git=False,
+        idea="search-agent",
+        event_bus=event_bus,
+    )
+    if meta_config is not None:
+        agent_config.llm_timeout = meta_config.llm_timeout
+        agent_config.llm_provider_retries = meta_config.llm_provider_retries
+        agent_config.llm_retry_attempts = meta_config.llm_retry_attempts
+        agent_config.llm_retry_base_delay = meta_config.llm_retry_base_delay
+        agent_config.llm_retry_max_delay = meta_config.llm_retry_max_delay
+
+    tools: list = [
+        WebSearchTool(
+            cwd=cwd,
+            endpoint_url=search_config.web_search_endpoint,
+            provider=search_config.web_search_provider,
+            api_key=search_config.web_search_api_key,
+        ),
+    ]
+    if search_config.web_browse_endpoint:
+        tools.append(
+            WebVisitTool(
+                cwd=cwd,
+                endpoint_url=search_config.web_browse_endpoint,
+                max_content_tokens=search_config.visit_max_content_tokens,
+                api_key=search_config.web_browse_api_key,
+            )
+        )
+
+    agent = Agent(
+        provider=provider,
+        tools=tools,
+        system_prompt=SEARCH_AGENT_SYSTEM_PROMPT,
+        config=agent_config,
+    )
+    # SearchAgent never touches git.
+    agent.git_manager.enabled = False
+    return agent
