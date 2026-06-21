@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Research Agent"
+  short_description: "Public entrypoint for DevPilot research runs"
+  default_prompt: "Use $devpilot-research-agent to run an DevPilot-style research workflow from a natural-language goal."
