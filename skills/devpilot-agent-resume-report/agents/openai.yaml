@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Resume Report"
+  short_description: "Resumes DevPilot runs and writes reports"
+  default_prompt: "Use $devpilot-agent-resume-report to resume an DevPilot run or write REPORT.md."

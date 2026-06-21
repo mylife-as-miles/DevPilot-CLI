@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Plugins HITL Budget"
+  short_description: "Applies DevPilot plugins, HITL, and budgets"
+  default_prompt: "Use $devpilot-agent-plugins-hitl-budget to apply DevPilot plugins, HITL gates, and budgets."
