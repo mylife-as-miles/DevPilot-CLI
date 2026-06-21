@@ -1,0 +1,744 @@
+"""Interactive REPL that drives the intake agent."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Callable, Iterable
+
+import typer
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.styles import Style
+from rich.console import Console
+from rich.markup import escape
+from rich.panel import Panel
+from rich.table import Table
+
+from ..._app import CONFIG_DIR_NAME
+from .._constants import (
+    INTAKE_LLM_RETRY_ATTEMPTS,
+    INTAKE_LLM_RETRY_BASE_DELAY,
+    INTAKE_LLM_RETRY_MAX_DELAY,
+)
+from ...core.agent import Agent
+from ...core.config import AgentConfig
+from ...core.llm.base import LLMProvider
+from ...core.tools.base import Tool
+from ...core.tools.bash import BashTool
+from ...core.tools.file_read import FileReadTool
+from ...core.tools.glob_tool import GlobTool
+from ...core.tools.grep import GrepTool
+from .display import IntakeDisplay
+from .launch_tool import LaunchExperimentTool, LaunchPlan, LaunchState
+from .system_prompt import build_system_prompt
+from ..resume_picker import ResumableSession
+
+
+_console = Console()
+
+
+# Single source of truth for slash commands.
+# (name, description) — the completer renders these, _handle_slash dispatches.
+SLASH_COMMANDS: list[tuple[str, str]] = [
+    ("/help",  "show available commands"),
+    ("/resume", "resume a previous run"),
+    ("/plugin", "select plugin: /plugin <name> [profile]"),
+    ("/skill", "manage skills: /skill load|unload <name...>"),
+    ("/status", "show intake status"),
+    ("/quit",  "exit without launching"),
+    ("/abort", "exit without launching"),
+    ("/reset", "clear chat history (keep session)"),
+    ("/tools", "list the agent's available tools"),
+    ("/plan",  "show the agent's pending plan, if any"),
+    ("/contract", "show the pending Research Contract"),
+]
+
+
+async def run_intake(
+    *,
+    provider: LLMProvider,
+    starting_cwd: Path,
+    seed_message: str | None,
+    workspace_dir: Path | None = None,
+    intake_max_turns: int = 30,
+) -> LaunchPlan | ResumableSession | None:
+    """Drive the intake REPL. Returns the launch outcome:
+
+    - ``LaunchPlan``       — the user described a goal; start a fresh run
+    - ``ResumableSession`` — the user ran ``/resume`` and picked a past run
+    - ``None``             — the user aborted
+
+    `starting_cwd` is the directory the user invoked the CLI from. It is
+    only a hint — the agent must confirm or correct it before launching.
+    The intake workspace dir (tool persistence, etc.) lives next to it.
+    """
+    starting_cwd = starting_cwd.resolve()
+
+    state = LaunchState()
+    intake_workspace = (workspace_dir or (starting_cwd / CONFIG_DIR_NAME / "_intake")).resolve()
+    intake_workspace.mkdir(parents=True, exist_ok=True)
+
+    # Tools are constructed with starting_cwd as the base for *relative*
+    # paths; absolute paths work unrestricted, which is what we want here.
+    tools: list[Tool] = [
+        FileReadTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace)),
+        GlobTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace)),
+        GrepTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace)),
+        BashTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace)),
+        LaunchExperimentTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace), state=state),
+    ]
+
+    agent_config = AgentConfig(
+        cwd=str(starting_cwd),
+        provider=_provider_label(provider),
+        model=getattr(provider, "model", "unknown"),
+        max_turns=intake_max_turns,
+        llm_retry_attempts=INTAKE_LLM_RETRY_ATTEMPTS,
+        llm_retry_base_delay=INTAKE_LLM_RETRY_BASE_DELAY,
+        llm_retry_max_delay=INTAKE_LLM_RETRY_MAX_DELAY,
+        auto_git=False,  # the intake agent is read-only — no commits
+    )
+
+    agent = Agent(
+        provider=provider,
+        tools=tools,
+        system_prompt=build_system_prompt(starting_cwd=str(starting_cwd)),
+        config=agent_config,
+    )
+
+    _print_welcome(
+        seed_message,
+        starting_cwd=starting_cwd,
+        model=getattr(provider, "model", None),
+        base_url=getattr(provider, "base_url", None),
+    )
+
+    session = _build_session(starting_cwd, state=state)
+
+    # Seed message: if the user gave one on the CLI, feed it as the first user turn
+    pending_user_input: str | None = seed_message
+
+    while True:
+        if pending_user_input is None:
+            try:
+                user_text = await _read_user_line(session)
+            except (EOFError, KeyboardInterrupt):
+                _console.print("\n[yellow]aborted[/yellow]")
+                return None
+        else:
+            user_text = pending_user_input
+            pending_user_input = None
+            _console.print(f"[dim]you (seed):[/dim] {user_text}\n")
+
+        user_text = user_text.strip()
+        if not user_text:
+            continue
+
+        # Slash commands stay client-side; agent never sees them
+        if user_text.startswith("/"):
+            action = _handle_slash(
+                user_text,
+                agent,
+                tools,
+                state,
+                starting_cwd=starting_cwd,
+                model=getattr(provider, "model", None),
+            )
+            if action == "quit":
+                return None
+            if action == "resume":
+                # The user picked a past run via /resume — hand it straight back
+                # so run_command resumes it instead of starting a fresh run.
+                return state.resume_target
+            continue
+
+        # Hand off to the agent under a compact display.
+        try:
+            with IntakeDisplay(console=_console):
+                reply = await agent.run(user_text)
+        except KeyboardInterrupt:
+            _console.print("\n[yellow]^C — interrupted[/yellow]")
+            if typer.confirm("Quit intake?", default=False):
+                return None
+            continue
+        if _is_llm_failure_reply(reply):
+            _print_llm_failure_hint(
+                provider=agent_config.provider,
+                model=getattr(provider, "model", None),
+                base_url=getattr(provider, "base_url", None),
+            )
+            continue
+
+        # The agent prints its own messages via core/agent.py's _print_*
+        # helpers, and it only fires LaunchExperiment after the user has
+        # explicitly approved the plan in conversation. So we hand the plan
+        # straight back — the single Research Contract panel + go/no-go gate
+        # lives in run.py, where the resolved hyperparameters (tree depth,
+        # model, …) are known. The user can still preview with /contract.
+        if state.launched:
+            return state.plan
+
+
+# ── helpers ────────────────────────────────────────────────────────
+
+
+def _is_llm_failure_reply(reply: str | None) -> bool:
+    if not reply:
+        return False
+    return reply.strip().lower().startswith("error: llm call failed")
+
+
+def _provider_label(provider: LLMProvider) -> str:
+    name = provider.__class__.__name__.lower()
+    if "claude" in name:
+        return "claude"
+    if "openai" in name:
+        return "openai"
+    return name.replace("provider", "") or "unknown"
+
+
+def _print_llm_failure_hint(*, provider: str, model: str | None, base_url: str | None) -> None:
+    """Durable, user-facing error for intake model/endpoint failures."""
+    lines = [
+        "The planning model did not answer, so DevPilot stayed in intake instead of launching a run.",
+        "",
+        f"provider: {provider or 'unknown'}",
+        f"model: {model or 'unknown'}",
+    ]
+    if base_url:
+        lines.append(f"endpoint: {base_url}")
+    lines.extend([
+        "",
+        "Check that the endpoint is running and serving that model, or update `devpilot config init ... --force`.",
+        "Type /quit to leave, or fix the endpoint and send your request again.",
+    ])
+    _console.print()
+    _console.print(Panel(
+        "\n".join(lines),
+        title="model unavailable",
+        title_align="left",
+        border_style="red",
+    ))
+    _console.print()
+
+
+async def _read_user_line(session: PromptSession) -> str:
+    """Prompt the user. Slash commands surface as a live dropdown.
+
+    Must use prompt_async() rather than prompt() because run_intake runs
+    inside an already-active asyncio event loop. Calling the sync prompt()
+    from inside a running loop raises RuntimeError.
+    """
+    prompt = ANSI("\033[1;32myou\033[0m \033[2m›\033[0m ")
+    return await session.prompt_async(prompt)
+
+
+class _SlashCompleter(Completer):
+    """Pop the slash-command menu the moment the user types '/'.
+
+    Only triggers on a leading slash so plain prose isn't interrupted.
+    """
+
+    def __init__(
+        self,
+        commands: Iterable[tuple[str, str]],
+        *,
+        skills: Iterable[tuple[str, str]] = (),
+        unloaded_skills: Callable[[], Iterable[str]] | None = None,
+        plugins: Iterable[tuple[str, str, tuple[str, ...]]] = (),
+        active_plugin: Callable[[], str | None] | None = None,
+    ) -> None:
+        self._commands = list(commands)
+        self._skills = list(skills)
+        self._unloaded_skills = unloaded_skills or (lambda: ())
+        self._plugins = list(plugins)
+        self._active_plugin = active_plugin or (lambda: None)
+        # Compute a uniform display width so all rows line up.
+        self._name_width = max(len(name) for name, _ in self._commands) if self._commands else 0
+        self._skill_width = max(len(name) for name, _ in self._skills) if self._skills else 0
+        self._plugin_width = max(len(name) for name, _, _ in self._plugins) if self._plugins else 0
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        if not text.startswith("/"):
+            return
+        if text.startswith("/skill "):
+            yield from self._skill_completions(text)
+            return
+        if text.startswith("/plugin "):
+            yield from self._plugin_completions(text)
+            return
+        for name, desc in self._commands:
+            if name.startswith(text):
+                yield Completion(
+                    name,
+                    start_position=-len(text),
+                    # Pad with two trailing spaces so the meta column doesn't
+                    # touch the command name.
+                    display=f"  {name:<{self._name_width}}  ",
+                    display_meta=desc,
+                )
+
+    def _skill_completions(self, text: str):
+        rest = text[len("/skill "):]
+        parts = rest.split()
+        action = parts[0].lower() if parts else ""
+        actions = (("load", "reload an unloaded skill"), ("unload", "disable a loaded skill"))
+
+        if action not in {"load", "unload"}:
+            prefix = "" if text.endswith(" ") else action
+            for name, desc in actions:
+                if name.startswith(prefix):
+                    yield Completion(
+                        name,
+                        start_position=-len(prefix) if prefix else 0,
+                        display=f"  {name:<8}  ",
+                        display_meta=desc,
+                    )
+            return
+
+        prefix = "" if text.endswith(" ") else (parts[-1] if len(parts) > 1 else "")
+        start_position = -len(prefix) if prefix else 0
+        already_mentioned = set(parts[1:] if text.endswith(" ") else parts[1:-1])
+        unloaded = set(self._unloaded_skills())
+        for name, desc in self._skills:
+            is_unloaded = name in unloaded
+            if name in already_mentioned:
+                continue
+            if name.startswith(prefix):
+                yield Completion(
+                    name,
+                    start_position=start_position,
+                    display=f"{'×' if is_unloaded else '✓'} {name:<{self._skill_width}}  ",
+                    display_meta=(f"unloaded skill · {desc}" if is_unloaded else f"loaded skill · {desc}"),
+                )
+
+    def _plugin_completions(self, text: str):
+        rest = text[len("/plugin "):]
+        parts = rest.split()
+        action = parts[0].lower() if parts else ""
+        actions = (("load", "load a plugin"), ("unload", "disable plugins for this run"), ("reset", "inherit config plugin"))
+
+        if action not in {"load", "unload", "reset"}:
+            prefix = "" if text.endswith(" ") else action
+            for name, desc in actions:
+                if name.startswith(prefix):
+                    yield Completion(
+                        name,
+                        start_position=-len(prefix) if prefix else 0,
+                        display=f"  {name:<8}  ",
+                        display_meta=desc,
+                    )
+            return
+        if action == "reset":
+            return
+
+        prefix = "" if text.endswith(" ") else (parts[-1] if len(parts) > 1 else "")
+        start_position = -len(prefix) if prefix else 0
+        active = self._active_plugin()
+        plugin_name = parts[1] if len(parts) > 1 else ""
+        if action == "load" and plugin_name and text.endswith(" "):
+            profiles = next((profiles for name, _, profiles in self._plugins if name == plugin_name), ())
+            for profile in profiles:
+                yield Completion(profile, start_position=0, display=f"  {profile:<16}  ", display_meta="profile")
+            return
+
+        for name, desc, _profiles in self._plugins:
+            is_loaded = name == active
+            if name.startswith(prefix):
+                yield Completion(
+                    name,
+                    start_position=start_position,
+                    display=f"{'◆' if is_loaded else ' '} {name:<{self._plugin_width}}  ",
+                    display_meta=(f"active plugin · {desc}" if is_loaded else desc),
+                )
+
+
+def _build_session(starting_cwd: Path | None = None, *, state: LaunchState | None = None) -> PromptSession:
+    """One PromptSession per intake run (carries history + completer state)."""
+    return PromptSession(
+        history=InMemoryHistory(),
+        completer=_SlashCompleter(
+            SLASH_COMMANDS,
+            skills=_available_skill_summaries(starting_cwd),
+            unloaded_skills=(lambda: state.unloaded_skills) if state is not None else None,
+            plugins=_available_plugin_summaries(starting_cwd),
+            active_plugin=(lambda: state.plugin if state.plugin_mode == "load" else None) if state is not None else None,
+        ),
+        complete_while_typing=True,
+        style=_MENU_STYLE,
+    )
+
+
+def _available_skill_summaries(starting_cwd: Path | None) -> list[tuple[str, str]]:
+    try:
+        from ...core.skill_registry import build_default_registry
+
+        registry = build_default_registry(str(starting_cwd or Path.cwd()))
+        return registry.summaries_with_source()
+    except Exception:
+        return []
+
+
+def _available_skill_names(starting_cwd: Path | None) -> list[str]:
+    return [name for name, _ in _available_skill_summaries(starting_cwd)]
+
+
+def _loaded_skill_names(starting_cwd: Path | None, unloaded_skills: Iterable[str]) -> list[str]:
+    unloaded = set(unloaded_skills)
+    return [name for name in _available_skill_names(starting_cwd) if name not in unloaded]
+
+
+def _available_plugin_summaries(starting_cwd: Path | None) -> list[tuple[str, str, tuple[str, ...]]]:
+    try:
+        from ...plugins import discover_plugins
+
+        search_dirs = []
+        if starting_cwd is not None and (starting_cwd / "plugins").is_dir():
+            search_dirs.append(starting_cwd / "plugins")
+        return [
+            (p.name, f"{p.source} · {p.description}", p.profiles)
+            for p in discover_plugins(search_dirs=search_dirs or None)
+        ]
+    except Exception:
+        return []
+
+
+# ── Slash-menu styling ─────────────────────────────────────────────
+#
+# Matches the welcome banner's cyan→magenta accent. Idle rows are dim
+# grey with a cyan command name; selected row inverts to a saturated
+# magenta background so it pops without being garish.
+_MENU_STYLE = Style.from_dict({
+    # Menu container & padding
+    "completion-menu":                              "bg:#1c1c1c",
+    "completion-menu.border":                       "fg:#5fafff bg:#1c1c1c",
+
+    # Idle row
+    "completion-menu.completion":                   "bg:#1c1c1c fg:#5fd7ff",
+    "completion-menu.meta.completion":              "bg:#1c1c1c fg:#808080",
+
+    # Selected row — magenta highlight
+    "completion-menu.completion.current":           "bg:#af00d7 fg:#ffffff bold",
+    "completion-menu.meta.completion.current":      "bg:#af00d7 fg:#ffd7ff",
+
+    # Scrollbar (visible only when list overflows)
+    "scrollbar.background":                         "bg:#1c1c1c",
+    "scrollbar.button":                             "bg:#5fafff",
+})
+
+
+def _print_welcome(seed: str | None, *, starting_cwd: Path,
+                   model: str | None = None,
+                   base_url: str | None = None) -> None:
+    """Render the splash. Wide brand line, dim context, single hint line."""
+    import os
+
+    from ..style import render_logo
+
+    # ── brand block (ASCII art + tagline), shared with resume / --yes ──
+    render_logo(_console)
+
+    # ── context (two-col, dim) ───────────────────────────────────────
+    home = os.path.expanduser("~")
+    short_cwd = str(starting_cwd)
+    if short_cwd == home:
+        short_cwd = "~"
+    elif short_cwd.startswith(home + os.sep):
+        short_cwd = "~" + short_cwd[len(home):]
+
+    rows: list[tuple[str, str]] = [("starting dir", short_cwd)]
+    if model:
+        endpoint_hint = f"  via {base_url}" if base_url else ""
+        rows.append(("model", f"{model}{endpoint_hint}"))
+    width = max(len(k) for k, _ in rows)
+    for k, v in rows:
+        _console.print(f"  [dim]{k.ljust(width)}[/dim]  [bold]{v}[/bold]")
+
+    # ── divider + hint ───────────────────────────────────────────────
+    _console.print()
+    _console.rule(style="dim cyan")
+    _console.print(
+        "  [dim]Tell me what you want to research, or [/dim][bold]/resume[/bold]"
+        "[dim] a past run. Type [/dim][bold]/help[/bold][dim] for commands, "
+        "[/dim][bold]/quit[/bold][dim] to exit.[/dim]"
+    )
+    if seed is None:
+        _console.print()
+
+
+def _print_plan_accepted(plan: LaunchPlan | None) -> None:
+    if plan is None:
+        return
+    lines = [f"[bold]Goal:[/bold] {plan.instruction}"]
+    if plan.rationale:
+        lines.append("")
+        lines.append(plan.rationale)
+    if plan.suggested_max_cycles is not None:
+        lines.append("")
+        lines.append(f"Suggested cycles: {plan.suggested_max_cycles}")
+    if plan.suggested_max_turns is not None:
+        lines.append(f"Suggested max turns: {plan.suggested_max_turns}")
+    if plan.notes:
+        lines.append("")
+        lines.append("Notes:")
+        for n in plan.notes:
+            lines.append(f"  - {n}")
+    _console.print()
+    _console.print(Panel("\n".join(lines), title="Plan accepted — handing off",
+                         border_style="green"))
+
+
+def _print_research_contract(plan: LaunchPlan) -> None:
+    """Preview the pending plan (the /contract command).
+
+    Mid-planning preview, so it shows only the plan-level fields the user has
+    decided — target, objective, budget. The resolved hyperparameters (tree
+    depth, model, review mode) are added to the full Research Contract panel at
+    launch time in run.py, once config is resolved.
+    """
+    from ..i18n import detect_lang, t
+
+    lang = detect_lang(plan.instruction, plan.rationale)
+    table = Table.grid(padding=(0, 2))
+    table.add_column(style="dim", justify="right")
+    table.add_column(style="white", overflow="fold")
+    table.add_row(t(lang, "target"), escape(plan.cwd))
+    table.add_row(t(lang, "optimize"), escape(plan.instruction))
+    budget = []
+    sep = "" if lang == "zh" else " "
+    if plan.suggested_max_cycles is not None:
+        budget.append(f"{plan.suggested_max_cycles}{sep}{t(lang, 'branch_cycles')}")
+    if plan.suggested_max_turns is not None:
+        budget.append(f"{plan.suggested_max_turns}{sep}{t(lang, 'coordinator_turns')}")
+    table.add_row(t(lang, "budget"),
+                  escape(", ".join(budget) if budget else t(lang, "budget_defaults")))
+    _console.print()
+    _console.print(Panel(table, title=t(lang, "contract_title"), title_align="left", border_style="cyan"))
+    _console.print()
+
+
+def _handle_slash(
+    line: str,
+    agent: Agent,
+    tools: list[Tool],
+    state: LaunchState,
+    *,
+    starting_cwd: Path | None = None,
+    model: str | None = None,
+) -> str:
+    cmd = line.lower().split()[0]
+    if cmd == "/help":
+        _console.print("[bold]commands[/bold] [dim](type / to bring up the menu)[/dim]")
+        for name, desc in SLASH_COMMANDS:
+            _console.print(f"  [cyan]{name:<8}[/cyan] [dim]{desc}[/dim]")
+    elif cmd == "/resume":
+        # List this project's past runs and let the user pick one to resume.
+        # Reuses the standalone picker; a chosen session is stashed on the
+        # shared state and the main loop returns it from run_intake.
+        from ..resume_picker import find_resumable_sessions, prompt_resume_choice
+
+        sessions = (
+            find_resumable_sessions(starting_cwd, include_subdirs=True)
+            if starting_cwd else []
+        )
+        if not sessions:
+            where = escape(str(starting_cwd)) if starting_cwd else "this directory"
+            _console.print(
+                f"[yellow]No resumable runs found[/] under [dim]{where}[/]."
+            )
+            _console.print(
+                "  [dim]Resume is per-project: runs live in "
+                "[/dim][cyan].devpilot/sessions/[/cyan][dim] under the project you "
+                "worked on.\n"
+                "  Launch [/dim][cyan]devpilot[/cyan][dim] from inside (or just "
+                "above) that project, or start a new run by describing your "
+                "goal.[/dim]"
+            )
+            return "continue"
+        chosen = prompt_resume_choice(sessions, console=_console)
+        if chosen is None:
+            return "continue"        # user declined (N) → stay in intake
+        state.resume_target = chosen
+        return "resume"
+    elif cmd == "/status":
+        _console.print("[bold]intake status[/bold]")
+        if starting_cwd is not None:
+            _console.print(f"  [dim]starting dir[/dim] {escape(str(starting_cwd))}")
+        if model:
+            _console.print(f"  [dim]model[/dim] {escape(model)}")
+        _console.print(f"  [dim]plugin[/dim] {escape(_plugin_display(state))}")
+        loaded_skills = ", ".join(_loaded_skill_names(starting_cwd, state.unloaded_skills)) or "—"
+        unloaded_skills = ", ".join(state.unloaded_skills) if state.unloaded_skills else "—"
+        _console.print(f"  [dim]skills loaded[/dim] {escape(loaded_skills)}")
+        _console.print(f"  [dim]skills unloaded[/dim] {escape(unloaded_skills)}")
+        _console.print(f"  [dim]turns[/dim] {agent.total_turns}")
+        _console.print(f"  [dim]pending plan[/dim] {'yes' if state.plan else 'no'}")
+    elif cmd == "/plugin":
+        _handle_plugin_command(line, state, starting_cwd=starting_cwd)
+    elif cmd == "/skill":
+        _handle_skill_command(line, state, starting_cwd=starting_cwd)
+    elif cmd in ("/quit", "/abort"):
+        return "quit"
+    elif cmd == "/reset":
+        agent.messages.clear()
+        _console.print("[dim]history cleared[/dim]")
+    elif cmd == "/tools":
+        for t in tools:
+            _console.print(f"  - {t.name}: {t.description.splitlines()[0]}")
+    elif cmd in ("/plan", "/contract"):
+        if state.plan:
+            if cmd == "/contract":
+                _print_research_contract(state.plan)
+            else:
+                _print_plan_accepted(state.plan)
+        else:
+            _console.print("[dim]no contract yet[/dim]")
+    else:
+        _console.print(f"[yellow]unknown command: {cmd} (try /help)[/yellow]")
+    return "continue"
+
+
+def _plugin_display(state: LaunchState) -> str:
+    if state.plugin_mode == "disabled":
+        return "disabled (overrides config)"
+    if state.plugin_mode != "load" or not state.plugin:
+        return "config/default"
+    if state.plugin_profile:
+        return f"{state.plugin} ({state.plugin_profile})"
+    return state.plugin
+
+
+def _handle_plugin_command(
+    line: str,
+    state: LaunchState,
+    *,
+    starting_cwd: Path | None,
+) -> None:
+    parts = line.split()
+    if len(parts) == 1:
+        _console.print("[bold]plugin[/bold]")
+        _console.print(f"  [dim]selection[/dim] {escape(_plugin_display(state))}")
+        available = ", ".join(
+            f"{name} ({meta.split(' · ', 1)[0]})"
+            for name, meta, _profiles in _available_plugin_summaries(starting_cwd)
+        ) or "none"
+        _console.print(f"  [dim]available[/dim] {escape(available)}")
+        _console.print("  [dim]usage[/dim] [cyan]/plugin load <name> [profile][/cyan]  [dim]or[/dim]  [cyan]/plugin unload[/cyan]")
+        _console.print("  [dim]reset[/dim] [cyan]/plugin reset[/cyan] [dim](inherit config)[/dim]")
+        return
+
+    action = parts[1].lower()
+    if action in {"reset", "clear", "default"}:
+        previous = _plugin_display(state)
+        state.plugin = None
+        state.plugin_profile = None
+        state.plugin_mode = "inherit"
+        _console.print(f"[dim]plugin selection reset[/dim] {escape(previous)} → config/default")
+        return
+
+    if action in {"unload", "disable", "off", "none"}:
+        previous = _plugin_display(state)
+        state.plugin = None
+        state.plugin_profile = None
+        state.plugin_mode = "disabled"
+        _console.print(f"[yellow]plugin disabled for this run[/yellow] [dim](was {escape(previous)})[/dim]")
+        return
+
+    if action == "load":
+        if len(parts) < 3:
+            _console.print("[yellow]usage: /plugin load <name> [profile][/yellow]")
+            return
+        name = parts[2].strip()
+        profile = parts[3].strip() if len(parts) > 3 else None
+    else:
+        name = parts[1].strip()
+        profile = parts[2].strip() if len(parts) > 2 else None
+
+    summaries = {pname: (meta, profiles) for pname, meta, profiles in _available_plugin_summaries(starting_cwd)}
+    if name not in summaries:
+        available = ", ".join(summaries) or "none"
+        _console.print(f"[yellow]unknown plugin: {escape(name)}[/yellow]")
+        _console.print(f"[dim]available[/dim] {escape(available)}")
+        return
+
+    _meta, profiles = summaries[name]
+    if profile and profile not in profiles:
+        available = ", ".join(profiles) or "none"
+        _console.print(f"[yellow]unknown profile for {escape(name)}: {escape(profile)}[/yellow]")
+        _console.print(f"[dim]available profiles[/dim] {escape(available)}")
+        return
+
+    state.plugin = name
+    state.plugin_profile = profile
+    state.plugin_mode = "load"
+    _console.print(f"[green]plugin active[/green] {escape(_plugin_display(state))}")
+
+
+def _handle_skill_command(
+    line: str,
+    state: LaunchState,
+    *,
+    starting_cwd: Path | None,
+) -> None:
+    parts = line.split()
+    if len(parts) == 1:
+        _console.print("[bold]skills[/bold]")
+        try:
+            from ...core.skill_registry import build_default_registry
+
+            registry = build_default_registry(str(starting_cwd or Path.cwd()))
+            unloaded = set(state.unloaded_skills)
+            loaded = ", ".join(name for name in registry.names() if name not in unloaded) or "—"
+            unloaded_text = ", ".join(state.unloaded_skills) if state.unloaded_skills else "—"
+            available = ", ".join(
+                f"{name} ({meta.split(' · ', 1)[0]})"
+                for name, meta in registry.summaries_with_source()
+            ) or "none"
+            _console.print(f"  [dim]loaded[/dim] {escape(loaded)}")
+            _console.print(f"  [dim]unloaded[/dim] {escape(unloaded_text)}")
+            _console.print(f"  [dim]available[/dim] {escape(available)}")
+        except Exception:
+            unloaded_text = ", ".join(state.unloaded_skills) if state.unloaded_skills else "—"
+            _console.print(f"  [dim]unloaded[/dim] {escape(unloaded_text)}")
+            pass
+        _console.print("  [dim]usage[/dim] [cyan]/skill load <name...>[/cyan]  [dim]or[/dim]  [cyan]/skill unload <name...>[/cyan]")
+        _console.print("  [dim]reset[/dim] [cyan]/skill reset[/cyan]")
+        return
+
+    action = parts[1].lower()
+    if action in {"clear", "reset"}:
+        state.unloaded_skills.clear()
+        _console.print("[dim]all default skills loaded[/dim]")
+        return
+
+    names = [part.strip() for part in parts[2:] if part.strip()]
+    if action not in {"load", "unload"} or not names:
+        _console.print("[yellow]usage: /skill load <name...> or /skill unload <name...>[/yellow]")
+        return
+
+    known = set(_available_skill_names(starting_cwd))
+    unknown = [name for name in names if name not in known]
+    if unknown:
+        _console.print(f"[yellow]unknown skill(s): {escape(', '.join(unknown))}[/yellow]")
+        return
+
+    unloaded = set(state.unloaded_skills)
+    if action == "unload":
+        changed = [name for name in names if name not in unloaded]
+        unloaded.update(names)
+        state.unloaded_skills = sorted(unloaded)
+        if changed:
+            _console.print(f"[yellow]skills unloaded[/yellow] {escape(', '.join(changed))}")
+        else:
+            _console.print(f"[dim]already unloaded[/dim] {escape(', '.join(names))}")
+    else:
+        changed = [name for name in names if name in unloaded]
+        unloaded.difference_update(names)
+        state.unloaded_skills = sorted(unloaded)
+        if changed:
+            _console.print(f"[green]skills loaded[/green] {escape(', '.join(changed))}")
+        else:
+            _console.print(f"[dim]already loaded[/dim] {escape(', '.join(names))}")
