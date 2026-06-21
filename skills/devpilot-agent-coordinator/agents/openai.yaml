@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Coordinator Loop"
+  short_description: "Runs the DevPilot Idea Tree control loop"
+  default_prompt: "Use $devpilot-agent-coordinator to run the DevPilot Idea Tree coordinator loop."

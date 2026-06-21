@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Executor Dispatch"
+  short_description: "Runs isolated DevPilot executor workflows"
+  default_prompt: "Use $devpilot-agent-executor to dispatch and record isolated DevPilot executor work."
