@@ -1,0 +1,202 @@
+# DevPilot — GitLab flow (slim, under 64 KiB)
+# Prompts load from repo files at runtime. Commit GITLAB_*_MEGA_PROMPT.txt first.
+# For catalog agents instead of a flow, see gitlab-flow/AGENT_SETUP.md
+
+version: "v1"
+environment: ambient
+
+components:
+  - name: "devpilot_intake"
+    type: AgentComponent
+    prompt_id: "devpilot_intake_prompt"
+    inputs:
+      - from: "context:goal"
+        as: "user_goal"
+      - from: "context:project_id"
+        as: "project_id"
+      - from: "context:run_name"
+        as: "run_name"
+    toolset:
+      - "get_repository_file"
+      - "list_repository_tree"
+      - "gitlab_blob_search"
+      - "find_files"
+      - "grep"
+      - "read_file"
+      - "list_work_items"
+      - "get_work_item"
+      - "create_work_item"
+      - "update_work_item"
+      - "create_work_item_note"
+      - "create_plan"
+      - "get_plan"
+      - "add_new_task"
+      - "orbit_list_commands"
+      - "orbit_invoke_command"
+      - "orbit_query_graph"
+      - "orbit_get_graph_schema"
+      - "orbit_get_graph_status"
+    ui_log_events:
+      - "on_agent_final_answer"
+
+  - name: "devpilot_coordinator_hub"
+    type: AgentComponent
+    prompt_id: "devpilot_coordinator_hub_prompt"
+    inputs:
+      - from: "context:goal"
+        as: "user_goal"
+      - from: "context:project_id"
+        as: "project_id"
+      - from: "context:run_name"
+        as: "run_name"
+      - from: "context:max_cycles"
+        as: "max_cycles"
+      - from: "context:devpilot_intake.final_answer"
+        as: "research_contract"
+    toolset:
+      - "get_repository_file"
+      - "list_repository_tree"
+      - "gitlab_blob_search"
+      - "find_files"
+      - "grep"
+      - "read_file"
+      - "list_work_items"
+      - "get_work_item"
+      - "create_work_item"
+      - "update_work_item"
+      - "create_work_item_note"
+      - "create_plan"
+      - "get_plan"
+      - "add_new_task"
+      - "orbit_list_commands"
+      - "orbit_invoke_command"
+      - "orbit_query_graph"
+      - "orbit_get_graph_schema"
+      - "orbit_get_graph_status"
+      - "get_pipeline_errors"
+      - "get_job_logs"
+      - "ci_linter"
+      - "run_tests"
+      - "get_merge_request"
+      - "list_merge_request_diffs"
+      - "create_merge_request"
+      - "create_merge_request_note"
+      - "edit_file"
+      - "create_file_with_contents"
+      - "mkdir"
+      - "run_command"
+      - "run_git_command"
+      - "run_tests"
+      - "gitlab_blob_search"
+      - "grep"
+      - "read_file"
+      - "gitlab_documentation_search"
+      - "gitlab_issue_search"
+      - "gitlab_merge_request_search"
+    ui_log_events:
+      - "on_agent_final_answer"
+
+routers:
+  - from: "devpilot_intake"
+    to: "devpilot_coordinator_hub"
+  - from: "devpilot_coordinator_hub"
+    to: "end"
+
+flow:
+  entry_point: "devpilot_intake"
+
+prompts:
+  - name: "DevPilot Intake"
+    prompt_id: "devpilot_intake_prompt"
+    unit_primitives: []
+    prompt_template:
+      system: |
+        You are DevPilot intake (planning agent).
+        
+        **First turn (required):** use `get_repository_file` to load `GITLAB_INTAKE_MEGA_PROMPT.txt`
+        from the repository default branch. Follow that file exactly — it is the full system prompt.
+        
+        If the file is missing, tell the user to commit the DevPilot mega-prompt files to this project.
+        
+        Project: gitlab-ai-hackathon/transcend/35314637
+        Output: a complete research contract only. Do not run the coordinator loop.
+      user: |
+        Project ID: {{project_id}}
+        Run name: {{run_name}}
+        Goal: {{user_goal}}
+      placeholder: history
+    params:
+      timeout: 300
+
+  - name: "DevPilot Coordinator Hub"
+    prompt_id: "devpilot_coordinator_hub_prompt"
+    unit_primitives: []
+    prompt_template:
+      system: |
+        You are DevPilot coordinator (persistent research director).
+        
+        **First turn (required):** use `get_repository_file` to load `GITLAB_COORDINATOR_MEGA_PROMPT.txt`
+        from the repository default branch. Follow that file exactly — it is the full system prompt.
+        
+        If the file is missing, tell the user to commit the DevPilot mega-prompt files to this project.
+        
+        You run as a **single persistent ReAct loop** (native DevPilot model). Do not hand off to
+        separate catalog agents. Use git/repo/CI tools as RunExecutor; persist the Idea Tree at
+        `.devpilot/sessions/{{run_name}}/.coordinator/idea_tree.json`; write REPORT.md when done.
+        
+        
+        ================================================================================
+        SECTION F — GITLAB FLOW RUNTIME (coordinator hub — matches native DevPilot)
+        ================================================================================
+        
+        You are the **persistent coordinator ReAct loop**. Native DevPilot runs you as a
+        single long-lived agent (`CoordinatorOrchestrator`); this flow does the same in
+        one AgentComponent session. Do **not** treat executor or search as separate
+        top-level agents you hand off to.
+        
+        ## Shared state (Idea Tree)
+        
+        - Persist the Idea Tree at:
+          `.devpilot/sessions/{{run_name}}/.coordinator/idea_tree.json`
+        - Create/update it with repository file tools every cycle.
+        - Schema mirrors DevPilot v3: `meta` (baseline_score, trunk_score, eval_cmd, …)
+          and `nodes` (id, parent, hypothesis, status, score, insight, related_work).
+        - Pass `run_name` from flow input or default to `gitlab-flow-<timestamp>`.
+        
+        ## Tool mapping (native → GitLab)
+        
+        | Native tool | GitLab substitute |
+        |-------------|-------------------|
+        | RunExecutor | `run_git_command` (branch/worktree), `edit_file`, `run_command`, `run_tests` |
+        | GitMergeBranch | `create_merge_request` + protected-path discipline from merge-eval skill |
+        | SearchIdeaContext | Inline novelty search **after** node is done/merged **and** beats trunk; write `related_work` on the node |
+        | TreeView / TreeAddNode / … | Read/write `idea_tree.json` |
+        
+        ## Cycle protocol
+        
+        Repeat INIT (once) → OBSERVE → IDEATE → SELECT → DISPATCH → DECIDE until:
+        
+        - `max_cycles` flow input is reached (default **3**), or
+        - diminishing returns / budget stop, or
+        - user goal satisfied.
+        
+        **DISPATCH:** implement the selected idea yourself via git isolation + code edits +
+        B_dev eval. You are the coordinator; executors are a role you perform via tools,
+        not a separate flow stage.
+        
+        **Search:** only for validated winners (status done/merged, score > trunk). Do not
+        block the next IDEATE round on search — note `related_work` when ready.
+        
+        ## End of run
+        
+        Write `.devpilot/sessions/{{run_name}}/REPORT.md` and end with status **complete**.
+      user: |
+        Project ID: {{project_id}}
+        Run name: {{run_name}}
+        Max cycles: {{max_cycles}}
+        Goal: {{user_goal}}
+        Research contract:
+        {{research_contract}}
+      placeholder: history
+    params:
+      timeout: 1200
