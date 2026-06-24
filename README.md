@@ -71,14 +71,14 @@ Each **DevPilot cycle** follows six steps:
 ### From PyPI
 
 ```bash
-pip install devpilot-agent
+pip install miles-devpilot-cli
 devpilot doctor
 ```
 
 For an isolated global install:
 
 ```bash
-pipx install devpilot-agent
+pipx install miles-devpilot-cli
 ```
 
 ### From source

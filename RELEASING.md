@@ -2,9 +2,9 @@
 
 Publishing a new version is fully automated. You pick a version number and create
 a tag; GitHub Actions builds the package, publishes it to
-[PyPI](https://pypi.org/project/devpilot-agent/), and creates a GitHub Release.
+[PyPI](https://pypi.org/project/miles-devpilot-cli/), and creates a GitHub Release.
 
-> The distribution name on PyPI is **`devpilot-agent`** (the import name stays `devpilot`).
+> The distribution name on PyPI is **`miles-devpilot-cli`** (the import name stays `devpilot`).
 
 ## TL;DR
 
@@ -13,7 +13,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-That's it. A few minutes later `pip install -U devpilot-agent` gives users `0.2.0`.
+That's it. A few minutes later `pip install -U miles-devpilot-cli` gives users `0.2.0`.
 
 ## Versioning rules
 
@@ -83,14 +83,14 @@ A failed run never affects versions already on PyPI. Check the **Actions** tab f
 logs, fix the issue, then push a **new** tag (you cannot reuse the failed version
 number) — e.g. `v0.2.1`.
 
-## One-time setup (already done)
+## One-time setup
 
-For reference, the automation depends on a PyPI **Trusted Publisher** configured at
-`https://pypi.org/manage/project/devpilot-agent/settings/publishing/` with:
+The automation depends on a PyPI **Trusted Publisher** configured at
+`https://pypi.org/manage/project/miles-devpilot-cli/settings/publishing/` with:
 
 | Field | Value |
 |-------|-------|
-| Owner | `RUC-NLPIR` |
-| Repository | `DevPilot` |
+| Owner | `mylife-as-miles` |
+| Repository | `DevPilot-CLI` |
 | Workflow | `publish.yml` |
 | Environment | `pypi` |
