@@ -18,6 +18,8 @@ import argparse
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .reasoning_effort import REASONING_EFFORT_CHOICES
+
 
 @dataclass(frozen=True)
 class CLIField:
@@ -44,12 +46,12 @@ class CLIField:
 # the groups they expose, so a shared field (e.g. --provider) is declared once.
 
 LLM_FLAGS: tuple[CLIField, ...] = (
-    CLIField("--provider", "provider", str, "Backend: auto (default) | anthropic | openai-responses | openai-chat | openai-oauth | litellm", choices=("auto", "anthropic", "claude", "openai", "openai-responses", "openai-chat", "openai-oauth", "litellm")),
+    CLIField("--provider", "provider", str, "Backend: auto (default) | anthropic | gemini | openai-responses | openai-chat | openai-oauth | litellm", choices=("auto", "anthropic", "claude", "gemini", "google", "openai", "openai-responses", "openai-chat", "openai-oauth", "litellm")),
     CLIField("--model", "model", str, "Model name (default: claude-sonnet-4-20250514 / gpt-4o)"),
     CLIField("--api-key", "api_key", str, "API key (default: from env)"),
     CLIField("--base-url", "base_url", str, "Custom API base URL (vLLM, Ollama, proxy, ...)"),
     CLIField("--openai-api", "openai_api", str, "[legacy] OpenAI mode when --provider openai (use --provider openai-responses/-chat instead)", choices=("responses", "chat")),
-    CLIField("--reasoning-effort", "reasoning_effort", str, "Reasoning effort; Claude maps to thinking budget (default: high)", choices=("low", "medium", "high", "none")),
+    CLIField("--reasoning-effort", "reasoning_effort", str, "Reasoning effort: high|medium|low|minimal|none (Gemini → thinking_level; default: high)", choices=REASONING_EFFORT_CHOICES),
     CLIField("--reasoning-summary", "reasoning_summary", str, "OpenAI Responses reasoning.summary (default: auto; 'none' to omit)"),
     CLIField("--text-verbosity", "text_verbosity", str, "OpenAI Responses text.verbosity (default: medium; 'none' to omit)", choices=("low", "medium", "high", "none")),
     CLIField("--parallel-tool-calls", "parallel_tool_calls", None, "Allow GPT Responses models to request multiple tools in one turn", bool_optional=True),

@@ -1,209 +1,160 @@
 <p align="center">
-  <img src="assets/hero.svg" alt="DevPilot — Optimize anything" width="100%">
+  <img src="assets/hero.svg" alt="DevPilot" width="100%">
 </p>
 
-
-# Toward Generalist Autonomous Research via Hypothesis-Tree Refinement
-
+<h1 align="center">DevPilot</h1>
 
 <p align="center">
-  <a href="https://arxiv.org/pdf/2606.11926"><img src="https://img.shields.io/badge/Paper-arXiv-B31B1B?style=for-the-badge&logo=arxiv&logoColor=white" alt="Paper"></a>
-  <a href="https://github.com/RUC-NLPIR/DevPilot"><img src="https://img.shields.io/badge/Code-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
-  <a href="https://RUC-NLPIR.github.io/DevPilot/"><img src="https://img.shields.io/badge/Project_Page-Live-0E9B9B?style=for-the-badge&logo=githubpages&logoColor=white" alt="Project Page"></a>
-  <a href="https://RUC-NLPIR.github.io/DevPilot/docs/"><img src="https://img.shields.io/badge/Docs-Material-526CFE?style=for-the-badge&logo=materialformkdocs&logoColor=white" alt="Docs"></a>
-  <a href="https://github.com/RUC-NLPIR/DevPilot/discussions"><img src="https://img.shields.io/badge/Discussions-Join-5865F2?style=for-the-badge&logo=github&logoColor=white" alt="Discussions"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-D22128?style=for-the-badge&logo=apache&logoColor=white" alt="License: Apache 2.0"></a>
+  <strong>Autonomous research for your codebase.</strong><br>
+  Describe a goal — DevPilot proposes ideas, runs experiments, and keeps what improves your metric.
 </p>
 
 <p align="center">
-  <b>English</b> | <a href="README.zh-CN.md">简体中文</a>
+  <a href="https://arxiv.org/pdf/2606.11926">Paper</a> ·
+  <a href="https://RUC-NLPIR.github.io/DevPilot/">Project page</a> ·
+  <a href="https://RUC-NLPIR.github.io/DevPilot/docs/">Documentation</a> ·
+  <a href="LICENSE">License</a>
 </p>
-
-**DevPilot is an autonomous research agent that turns a long-horizon objective into a
-cumulative search.** Give it a benchmark and a goal; it proposes hypotheses, edits
-code, runs real experiments, learns from the results, and keeps the improvements that
-hold up on held-out data. Instead of one-shot attempts that forget what failed, DevPilot
-grows a **hypothesis tree**: every idea becomes a branch — pruned if it fails,
-harvested if it works — and insights propagate back so later ideas start smarter.
-
-For more details, visit our [project page](https://RUC-NLPIR.github.io/DevPilot/)
-and read the [paper](https://arxiv.org/pdf/2606.11926). For a more detailed usage manual,
-see our [documentation](https://RUC-NLPIR.github.io/DevPilot/docs/). 🧭 You can also
-choose the [CLI or Skill version](#-cli-and-skill-versions) depending on your
-environment and workflow.
-
-## 📣 News
-
-- **2026-06** — DevPilot was featured by [VentureBeat](https://venturebeat.com/), one of the leading tech media outlets in the US: ["New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget"](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget). 📰
-- **2026-06** — DevPilot's native CLI runtime and Agent Skill Suite (Codex / Claude Code) are released. 🚀
-- **2026-06** — The DevPilot paper is released on [arXiv](https://arxiv.org/abs/2606.11926). 🎉
-
-## 💡 Why DevPilot
-
-* **General-purpose optimization** — From model training and harness engineering
-  to data synthesis, DevPilot can optimize any task as long as it has a target to
-  improve and a metric to measure progress.
-* **Practical agent runtime** — DevPilot is not only a research prototype; it ships
-  with both a native CLI runtime and an Agent Skill Suite for Codex and Claude
-  Code, so you can use the full CLI for the strongest DevPilot behavior or load the
-  skill suite inside another coding agent.
-* **Long-horizon structured exploration** — The hypothesis-tree framework lets
-  DevPilot keep running as a cumulative search: results, failure modes, and
-  distilled insights persist in the Idea Tree and propagate upward, so later
-  ideas start smarter instead of being lost in a scrollback buffer.
-* **Real experiment discipline** — Executors iterate on a dev split, validate on
-  a held-out test split, and only merge gains that clear a configurable margin,
-  reducing overfitting to the metric being optimized.
-* **Isolated, reversible execution** — Every experiment runs in its own git
-  worktree on a dedicated branch, so your `main` branch is never touched until
-  you choose to merge.
-* **Built for long experiments** — Long-running training is first-class, with
-  generous timeouts, partial-metric recovery on timeout, and optional staged
-  budgets from smoke to pilot to full runs.
-* **Model and workflow flexibility** — DevPilot supports Anthropic, OpenAI /
-  Responses API, and OpenAI-compatible backends through LiteLLM, including
-  DeepSeek, Gemini, Qwen, vLLM, Ollama, and local gateways.
-* **Steerable and adaptable** — A live terminal dashboard, read-only WebUI,
-  optional human-in-the-loop review, and one-line domain plugins let you steer
-  experiments without changing DevPilot's core code.
-
-## 🧩 Framework
 
 <p align="center">
-  <img src="assets/framework.png" alt="DevPilot framework" width="100%">
+  <a href="https://github.com/mylife-as-miles/DevPilot-CLI/actions"><img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python 3.10+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="Apache 2.0"></a>
 </p>
-
-DevPilot runs **two cooperating agents**:
-
-- **Coordinator** — the research director. It maintains the Idea Tree, drives the
-  search via the *devpilot cycle*, and dispatches experiments.
-- **Executor** — the research engineer. Given one idea, it faithfully implements the
-  code changes, runs the experiment in an isolated git worktree, and reports evidence.
-
-Together they repeat a six-step **devpilot cycle**:
-
-1. **Observe** — the Coordinator re-grounds itself in the Idea Tree, reading the
-   active frontier, constraints, ancestor insights, recent evidence, and current
-   best artifact.
-2. **Ideate** — it chooses a parent node and proposes child hypotheses that refine,
-   correct, or extend what the tree has already learned.
-3. **Select** — it chooses the most promising pending leaves to test, balancing
-   the current best direction with unresolved alternatives.
-4. **Dispatch** — selected hypotheses are sent to independent Executors, which
-   implement them in fresh worktrees and evaluate them on the dev signal.
-5. **Backpropagate** — DevPilot records each result, score, insight, and branch, then
-   abstracts the lesson upward so ancestor nodes and future ideas inherit it.
-6. **Decide** — the Coordinator chooses whether to merge, prune, continue, leave a
-   node pending, or stop, using held-out validation for merge decisions.
-
-## 🎬 Demo
-
-
-https://github.com/user-attachments/assets/49c1a306-d2e9-49d6-9c83-65e38a62df30
-
-
-
-## 🚀 CLI And Skill Versions
-
-This repository includes two ways to use DevPilot:
-
-| Version | Location | Best for | Recommendation |
-| --- | --- | --- | --- |
-| Native CLI runtime | Python package and `devpilot` command | Real DevPilot research runs, long experiments, dashboard, checkpoints, executor tools, merge/test discipline, plugins, reports | Recommended. This path is more complete, more reliable, and gives the best DevPilot behavior. |
-| Agent Skill Suite | [`skills/`](skills/README.md) | Codex or Claude Code environments where you want DevPilot-style behavior without running the native DevPilot runtime | Useful integration layer and fallback, but less complete than the CLI runtime. |
-
-If you can run the CLI, use the CLI. The native `devpilot` runtime contains the full
-implementation: intake, Research Contract, live dashboard, EventBus,
-checkpoint/resume, executor dispatch, protected dev/test evaluation discipline,
-SearchAgent, plugins, and final report generation.
-
-The repo-root [`skills/`](skills/README.md) directory is a Codex/Claude Code
-skill suite. After installation, invoke `$devpilot-research-agent` in Codex or
-`/devpilot-research-agent` in Claude Code and describe your research objective as
-you would in DevPilot. The skill suite performs DevPilot-style clarification first
-when target, metric, data, permissions, budget, or run mode are unclear, then
-loads the orchestrator and phase skills. This is separate from the internal
-runtime skills stored under `src/skills/`.
 
 ---
 
-## 📦 Install
+## Overview
 
-**Requirements:** Python ≥ 3.10 and Git. A virtual environment is recommended.
+DevPilot is an autonomous research agent that turns a long-horizon objective into a cumulative search. Give it a benchmark and a goal; it proposes hypotheses, edits code, runs real experiments, learns from the results, and keeps improvements that hold up on held-out data.
+
+Instead of one-shot attempts that forget what failed, DevPilot grows a **hypothesis tree**: every idea becomes a branch — pruned if it fails, harvested if it works — and insights propagate so later ideas start smarter.
+
+This repository is a maintained CLI distribution of [DevPilot](https://github.com/RUC-NLPIR/DevPilot), with first-class support for **Google Gemini** via the Interactions API, alongside Anthropic, OpenAI, and OpenAI-compatible backends.
+
+## Features
+
+- **Hypothesis-tree exploration** — Structured, long-horizon search with persistent insights across cycles.
+- **Real experiment discipline** — Executors iterate on a dev split, validate on a held-out test split, and only merge gains above a configurable margin.
+- **Isolated execution** — Each experiment runs in its own git worktree on a dedicated branch; `main` stays untouched until you choose to merge.
+- **Interactive intake** — A conversational setup phase turns your goal, metric, baseline, and constraints into a one-screen Research Contract before the run starts.
+- **Live observability** — Terminal dashboard, optional read-only WebUI, slash commands, and checkpoint/resume for long runs.
+- **Flexible LLM backends** — Anthropic Claude, OpenAI Responses API, Gemini (Interactions API), OpenAI-compatible gateways (DeepSeek, Qwen, vLLM, Ollama), and LiteLLM.
+- **Domain plugins** — Retarget evaluation rules, protected paths, and budgets with a single YAML plugin line.
+- **Agent Skill Suite** — Optional Codex / Claude Code skills for DevPilot-style workflows outside the native runtime.
+
+## Architecture
+
+<p align="center">
+  <img src="assets/framework.png" alt="DevPilot architecture" width="90%">
+</p>
+
+DevPilot runs two cooperating agents:
+
+| Agent | Role |
+| --- | --- |
+| **Coordinator** | Research director. Maintains the Idea Tree, drives the search cycle, and dispatches experiments. |
+| **Executor** | Research engineer. Implements one idea in an isolated worktree, runs evaluation, and reports evidence. |
+
+Each **DevPilot cycle** follows six steps:
+
+1. **Observe** — Re-ground in the Idea Tree: frontier, constraints, ancestor insights, and recent evidence.
+2. **Ideate** — Propose child hypotheses that refine or extend what the tree has learned.
+3. **Select** — Choose the most promising pending leaves to test next.
+4. **Dispatch** — Send selected hypotheses to independent Executors.
+5. **Backpropagate** — Record results, scores, and insights; abstract lessons upward.
+6. **Decide** — Merge, prune, continue, or stop based on held-out validation.
+
+## Installation
+
+**Requirements:** Python 3.10 or newer, Git, and an LLM API key.
+
+### From PyPI
 
 ```bash
-pip install devpilot-agent   # or: uv pip install devpilot-agent
-devpilot doctor              # verify PATH, git, API keys
-```
-
-> Prefer a global command? `pipx install devpilot-agent` makes `devpilot` available everywhere.
-
-<details>
-<summary>Install from source (for development)</summary>
-
-```bash
-git clone https://github.com/RUC-NLPIR/DevPilot.git
-cd DevPilot
-python -m venv .venv && source .venv/bin/activate   # recommended
-pip install -e .                                    # or: uv pip install -e .
+pip install devpilot-agent
 devpilot doctor
 ```
 
-For the docs site, `pip install -e ".[docs]" && mkdocs serve`, or read them online
-via the **Docs** badge above.
-
-</details>
-
----
-
-## ⚡ Getting Started
+For an isolated global install:
 
 ```bash
-devpilot setup       # one-time: configure provider / model / base_url / API key
-devpilot             # start an interactive session in the current directory
-devpilot doctor      # diagnose the install
+pipx install devpilot-agent
 ```
 
-`devpilot setup` writes `~/.devpilot/config.yaml`, so day-to-day you can just run `devpilot`
-with no flags. The first thing DevPilot does is an **intake conversation** that turns your
-goal, target directory, metric, baseline, budget, dev/test discipline, and artifact
-paths into a one-screen **DevPilot Research Contract**. Once you confirm it, the live
-dashboard takes over.
+### From source
 
 ```bash
-# Point at a benchmark directory and a config
+git clone https://github.com/mylife-as-miles/DevPilot-CLI.git
+cd DevPilot-CLI
+python -m venv .venv
+
+# Linux / macOS
+source .venv/bin/activate
+
+# Windows
+.\.venv\Scripts\Activate.ps1
+
+pip install -e .
+devpilot doctor
+```
+
+## Quick start
+
+### 1. Configure your model
+
+Run the setup wizard once. Settings are stored in `~/.devpilot/config.yaml`.
+
+```bash
+devpilot setup
+```
+
+You will be prompted for provider, model, base URL (if any), API key, and reasoning effort.
+
+### 2. Start a session
+
+```bash
+cd your-benchmark-directory
+devpilot
+```
+
+DevPilot opens an **intake conversation** to confirm your target directory, metric, baseline, budget, and evaluation discipline. When you approve the Research Contract, the coordinator launches and the live dashboard takes over.
+
+### 3. Run with options
+
+```bash
+# Point at a specific directory and config
 devpilot --cwd ./benchmark --config research_config.yaml
 
-# Give an initial goal up front; intake refines the rest
+# Seed the goal up front; intake refines the rest
 devpilot "improve validation score without touching the test split" --cwd ./benchmark
 
-# Small dry run
+# Limit exploration depth for a dry run
 devpilot --cwd ./benchmark --config research_config.yaml --max-cycles 3
 ```
 
-During a run you can type `/status`, `/tree`, `/evidence`, `/branches`, `/cost`,
-`/pause`, `/resume`, `/report`, or `/abort`.
+### In-session commands
 
-### Prepare a benchmark
+During a run, type slash commands such as `/status`, `/tree`, `/evidence`, `/branches`, `/cost`, `/pause`, `/resume`, `/report`, or `/abort`.
 
-Your target directory should have:
+## Preparing a benchmark
 
-- a runnable evaluation script (e.g. `run_eval.py`),
-- evaluation data (ideally a **dev** split and a held-out **test** split), and
-- a clean git repository (no uncommitted changes).
+Your target directory should include:
 
-A minimal `research_config.yaml`:
+- A runnable evaluation script (for example `run_eval.py`)
+- Evaluation data with a **dev** split and a held-out **test** split
+- A clean git repository (no uncommitted changes)
+
+Minimal project config:
 
 ```yaml
-# LLM/API live in `devpilot setup`; project config is usually just the task and budget.
 task: >
   Optimize the agent's accuracy on the benchmark.
   Do NOT modify the evaluation harness or data files.
 
 coordinator:
-  max_cycles: 10          # devpilot cycles to explore
-  max_depth: 2            # Idea Tree depth
-  merge_threshold: 5.0    # min held-out % gain to merge into trunk
+  max_cycles: 10
+  max_depth: 2
+  merge_threshold: 5.0
   ui:
     interaction_mode: review   # auto | direction | review | collaborative
 
@@ -211,262 +162,130 @@ executor:
   max_turns: 100
 ```
 
-A copy-pasteable example with every option lives in
-[`examples/research_config.example.yaml`](examples/research_config.example.yaml).
+See [`examples/research_config.example.yaml`](examples/research_config.example.yaml) for a full reference.
 
-### Try the runnable example task
+### Example: AlgoTune k-NN
 
-If you just want to watch DevPilot work end-to-end — **no API budget, no GPU** —
-[`examples/algotune_knn/`](examples/algotune_knn) is a tiny, self-contained
-benchmark modeled on [AlgoTune](https://algotune.io/). The task is to make a
-brute-force k-nearest-neighbours solver **faster** while producing the **same**
-output; the metric is the speedup over a reference implementation. It is pure
-NumPy, CPU-only, sub-second, and deterministic, with several genuine
-optimizations for the Idea Tree to discover.
+[`examples/algotune_knn/`](examples/algotune_knn) is a self-contained CPU-only benchmark: make a brute-force k-nearest-neighbours solver faster while matching the reference output. No GPU required; runs complete in seconds.
 
 ```bash
-cp -r examples/algotune_knn /tmp/algotune_knn   # run outside the DevPilot checkout
+cp -r examples/algotune_knn /tmp/algotune_knn
 cd /tmp/algotune_knn
 git init -q && git add -A && git commit -qm baseline
 devpilot
 ```
 
-In one 6-cycle run this drove the dev speedup from **1.01x → 7.77x** (held-out
-test **1.00x → 7.22x**). See [`examples/algotune_knn/README.md`](examples/algotune_knn/README.md)
-for the research contract and tuning knobs.
+Run this **outside** your DevPilot checkout so experiment worktrees do not modify the source repo.
 
----
+## Configuration
 
-## 🧠 How It Works
+### LLM providers
 
-### The devpilot cycle
+Global LLM settings live in `~/.devpilot/config.yaml` (written by `devpilot setup`). Per-project task and budget settings belong in a project config file.
 
-Each cycle runs six steps:
+| Provider | Description |
+| --- | --- |
+| `auto` | Detect the best backend for your model and endpoint. |
+| `anthropic` | Claude via the native Anthropic Messages API. |
+| `openai-responses` | OpenAI / o-series via the Responses API (reasoning chain preserved). |
+| `openai-chat` | Any OpenAI-compatible chat-completions endpoint. |
+| `openai-oauth` | ChatGPT subscription via browser login (experimental). |
+| `gemini` | Gemini via the Google Interactions API (`thinking_level` + function calling). |
 
-```
-① OBSERVE   analyze current results and failure modes
-② IDEATE    propose 1–3 new ideas from the analysis and tree insights
-③ SELECT    pick the highest-priority idea to test
-④ DISPATCH  run an Executor on it in an isolated git worktree
-⑤ BACKPROP  record the result; abstract the insight up to ancestor nodes
-⑥ DECIDE    continue / merge into trunk / prune / stop
-```
+Set API keys in the config file or via environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` / `GOOGLE_API_KEY`).
 
-
-### The Idea Tree
-
-```
-ROOT (baseline: 20%)
-├── 1: Retrieval optimization        [insight: "retrieval quality is the bottleneck"]
-│   ├── 1.1: Constraint decomposition + verification   [40%, merged]
-│   ├── 1.2: Periodic re-read injection                [40%, pruned — no net gain]
-│   └── 1.3: Answer-extraction tuning                  [35%, pruned]
-├── 2: Multi-perspective search      [insight: "search scaffolding hurts here"]
-│   └── 2.1: Breadth-first search                      [25%, pruned]
-└── 3: Code-level intervention       [insight: "code-level > prompt-level"]
-    ├── 3.1: Continuation injection                    [70%, merged]
-    └── 3.2: ANSWER-tag extraction                     [45%, done]
+```bash
+devpilot config show          # view current settings
+devpilot config init --force  # non-interactive reconfiguration
 ```
 
-- **Depth 0 (Root):** the research objective and global insights.
-- **Depth 1:** research directions (paper-title-level ideas).
-- **Depth 2+:** concrete methods, implemented and tested by Executors.
-
-### Git strategy & evaluation
-
-Each Executor works in its own worktree on a dedicated branch. Verified improvements merge
-into a per-run `trunk`; you promote `trunk` into `main` only when satisfied
-(`git merge research/run_xxx/trunk`). Executors iterate on a **dev** split, but a change is
-kept only if it clears a margin on the **held-out test** split — guarding against
-overfitting.
-
-### Human-in-the-loop
-
-Set `ui.interaction_mode` (or `--interaction-mode`) to choose how much you steer:
+### Interaction modes
 
 | Mode | Behavior |
 | --- | --- |
 | `auto` | Fully autonomous. |
-| `direction` | Asks you where to go next at ideation. |
+| `direction` | Asks where to go next at ideation. |
 | `review` | Pauses before each node and Executor. |
-| `collaborative` | `direction` + `review`. |
+| `collaborative` | Combines direction and review. |
 
-When paused, your input opens an isolated discussion with a read-only companion — it never
-pollutes the Coordinator's context. See [`docs/`](docs/index.md) for the full method.
+Set via `ui.interaction_mode` in your project config or the appropriate CLI flag.
 
----
+## CLI reference
 
-## ⚙️ Configuration
-
-LLM access is configured once with `devpilot setup` (stored in `~/.devpilot/config.yaml`) via a
-single `provider` field:
-
-| `provider` | Use it for |
+| Command | Description |
 | --- | --- |
-| `auto` *(default)* | Let DevPilot pick. It probes your endpoint's OpenAI **Responses** API and uses it when available (reasoning chain preserved), otherwise falls back to chat completions; Claude models use the native Anthropic API. The detected backend is frozen into the config. |
-| `openai-responses` | OpenAI / o-series models via the Responses API (encrypted reasoning chain preserved across turns). |
-| `openai-chat` | Any OpenAI-compatible chat-completions endpoint — DeepSeek / Qwen / GLM / vLLM / Ollama / local gateways. |
-| `anthropic` | Claude via the native Anthropic Messages API (signed thinking + prompt caching). |
-
-Most users just run `devpilot setup`, keep `auto`, and fill in `model` + `base_url`. Keys come
-from the environment or the config; per-project task and budget settings live in
-`research_config.yaml`. See the
-[configuration guide](https://RUC-NLPIR.github.io/DevPilot/docs/configuration/) and
-[`examples/research_config.example.yaml`](examples/research_config.example.yaml) for every
-option.
-
----
-
-## 🧰 CLI Reference
-
-Day to day you only need `devpilot`:
-
-| Command | What it does |
-| --- | --- |
-| `devpilot` | Start an interactive research session. |
-| `devpilot setup` | Configure provider / model / keys → `~/.devpilot/config.yaml`. |
+| `devpilot` | Start an interactive research session (intake + run). |
+| `devpilot setup` | Configure provider, model, and API keys. |
+| `devpilot doctor` | Diagnose install, PATH, git, and API connectivity. |
+| `devpilot config` | View or edit global configuration. |
 | `devpilot report <session>` | Re-render `REPORT.md` for a past session. |
-| `devpilot export <session> [output]` | Export a past session to self-contained HTML, or JSONL when `output` ends in `.jsonl`. |
-| `devpilot doctor` | Diagnose install, PATH, git, and API keys. |
+| `devpilot export <session>` | Export a session to HTML or JSONL. |
 | `devpilot version` | Print the installed version. |
 
-Lower-level entry points (`run-research`, `coordinator`, `executor`, `review-research`)
-remain for debugging — see the [CLI reference](https://RUC-NLPIR.github.io/DevPilot/docs/cli/).
+Lower-level entry points (`run-research`, `coordinator`, `executor`, `review-research`) are available for advanced workflows.
 
----
+## Outputs and resume
 
-## 🔌 Plugins & Skills
+Each run writes a session directory under `.devpilot/sessions/` containing:
 
-A single line retargets the agent to a new domain — evaluation protocol, protected
-data directories, required outputs, and timeout presets all come from the plugin:
+- `REPORT.md` — final research report
+- Idea Tree state and conversation history
+- `events.jsonl` and `run_stats.json`
+- Per-experiment artifacts
 
-```yaml
-plugin: mle_kaggle   # switches to Kaggle/MLE mode
-```
-
-A plugin is one YAML file (prompt-injection points + config overrides + profiles +
-lifecycle hooks + an eval contract); a Skill is a markdown playbook the agent loads on
-demand at runtime. A copy-pasteable Kaggle config lives in
-[`examples/kaggle_config.example.yaml`](examples/kaggle_config.example.yaml).
-
----
-
-## 💾 Output & Resume
-
-Each run writes a session directory with `REPORT.md`, `events.jsonl`, `run_stats.json`, the
-Idea Tree, and per-experiment artifacts under `.devpilot/sessions/`. Runs are resumable —
-interrupt with `Ctrl+C` and continue later with `--resume`; DevPilot reloads the Idea Tree and
-picks up where it left off.
+Interrupted runs can be resumed:
 
 ```bash
-devpilot report .devpilot/sessions/<run_name>   # re-render a past report
-devpilot export <run_name>                   # write .devpilot/sessions/<run_name>/devpilot-session-<run_name>.html
-devpilot export <run_name> session.jsonl     # export a JSONL artifact bundle
-devpilot --resume --run-name <run_name>      # continue an interrupted run
+devpilot --resume --run-name <run_name>
 ```
 
----
+## CLI vs. Agent Skills
 
-## 📊 Results
+| | Native CLI | Agent Skill Suite |
+| --- | --- | --- |
+| **Location** | `devpilot` command | [`skills/`](skills/README.md) |
+| **Best for** | Full research runs, dashboard, checkpoints, merge discipline | Codex / Claude Code environments |
+| **Recommendation** | Preferred for complete DevPilot behavior | Useful integration layer |
 
-DevPilot was evaluated as a single controller across model training, harness engineering,
-and data synthesis — only the material, objective, evaluator, and budget change. It
-wins the held-out test on all six tasks against strong single-agent baselines.
-
-| Task | Direction | Initial | Codex | Claude Code | **DevPilot** | Gain |
-| --- | --- | --- | --- | --- | --- | --- |
-| Optimizer Design | steps ↓ | 3325 | 3325 | 3287.5 | **3237.5** | +2.63% |
-| Architecture Design | loss ↓ | 1.098 | 1.083 | 1.033 | **1.028** | +6.38% |
-| Terminal-Bench 2.0 | pass ↑ | 69.81 | 73.59 | 71.70 | **77.36** | +7.55 |
-| BrowseComp | acc ↑ | 45.33 | 50.00 | 53.33 | **67.67** | +22.34 |
-| Search-Agent Data | gap ↑ | 5.00 | 9.00 | 12.00 | **18.00** | +13.0 |
-| Math-Reasoning Data | gap ↑ | 1.04 | 6.25 | 8.33 | **20.83** | +19.79 |
-
-On **MLE-Bench Lite** with GPT-5.5, DevPilot reaches **86.36% Any-Medal** (100% valid
-submissions, 95.45% above median, 77.27% gold). See the [paper](https://arxiv.org/pdf/2606.11926)
-for full protocols and ablations.
-
-
----
-
-## 🗂️ Project Structure
-
-The code lives in `src/` and is imported as the `devpilot` package.
+## Project structure
 
 ```
-src/                 # the `devpilot` package
-├── core/            Shared infrastructure: ReAct loop, tools, LLM providers, context mgmt
-├── executor/        Executor agent + `executor` CLI
-├── coordinator/     Coordinator agent, Idea Tree, orchestrator, coordinator tools
-├── cli/             `devpilot` CLI: intake, live dashboard, setup, doctor, config
-├── events/          Typed event bus and payloads
-├── report/          Report generation
-├── webui/           Read-only run-monitoring web server
-├── plugins/         Domain plugins (e.g. mle_kaggle.yaml)
-├── skills/          On-demand markdown playbooks
-├── dashboard.py     HTML dashboard generator
-├── run.py           `run-research` CLI
-└── review.py        `review-research` CLI
+src/                    # imported as the `devpilot` package
+├── core/               # ReAct loop, LLM providers, tools, context management
+├── coordinator/        # Idea Tree, orchestrator, coordinator tools
+├── executor/           # Executor agent and CLI
+├── cli/                # Interactive CLI, intake, setup, dashboard
+├── events/             # Typed event bus
+├── report/             # Report generation
+├── webui/              # Read-only monitoring server
+├── plugins/            # Domain plugins
+└── skills/             # On-demand markdown playbooks
 ```
 
----
+## Documentation
 
-## 🙏 Acknowledgements
+Detailed guides are available in [`docs/`](docs/index.md) and on the [project documentation site](https://RUC-NLPIR.github.io/DevPilot/docs/):
 
-DevPilot is built on the excellent foundation of
-[claw-code](https://github.com/ultraworkers/claw-code).
+- [Quickstart](docs/quickstart.md)
+- [Configuration](docs/configuration.md)
+- [Preparing a benchmark](docs/preparing-a-benchmark.md)
+- [Interaction modes](docs/interaction-modes.md)
+- [Outputs and resume](docs/outputs-and-resume.md)
+- [Plugins](docs/plugins.md)
 
-claw-code is an open-source Rust reimplementation of Claude Code. It provided
-the REPL framework, tool-calling infrastructure, and cross-platform compilation
-that made DevPilot's CLI possible. Huge thanks to the ultraworkers team for their
-outstanding work.
+## Contributing
 
-🔗 claw-code: https://github.com/ultraworkers/claw-code
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and guidelines.
 
----
+- [Discussions](https://github.com/RUC-NLPIR/DevPilot/discussions) — questions and ideas
+- [Issues](https://github.com/mylife-as-miles/DevPilot-CLI/issues) — bugs and feature requests for this fork
 
-## 📚 Citation
-
-```bibtex
-@misc{jin2026devpilot,
-  title  = {Toward Generalist Autonomous Research via Hypothesis-Tree Refinement},
-  author = {Jiajie Jin and Yuyang Hu and Kai Qiu and Qi Dai and Chong Luo and
-            Guanting Dong and Xiaoxi Li and Tong Zhao and Xiaolong Ma and
-            Gongrui Zhang and Zhirong Wu and Bei Liu and Zhengyuan Yang and
-            Linjie Li and Lijuan Wang and Hongjin Qian and Yutao Zhu and Zhicheng Dou},
-  year   = {2026},
-  eprint = {2606.11926},
-  archivePrefix = {arXiv},
-  url    = {https://arxiv.org/abs/2606.11926}
-}
-```
-
----
-
-## Star History
-
-<picture>
-  <source
-    media="(prefers-color-scheme: dark)"
-    srcset="https://api.star-history.com/svg?repos=RUC-NLPIR/DevPilot&type=Date&theme=dark"
-  />
-  <source
-    media="(prefers-color-scheme: light)"
-    srcset="https://api.star-history.com/svg?repos=RUC-NLPIR/DevPilot&type=Date"
-  />
-  <img
-    alt="Star History Chart"
-    src="https://api.star-history.com/svg?repos=RUC-NLPIR/DevPilot&type=Date"
-  />
-</picture>
-
----
-
-## 📄 License
+## License
 
 Released under the [Apache License 2.0](LICENSE).
 
----
+## Acknowledgments
 
-Built at the Gaoling School of Artificial Intelligence, Renmin University of China, and
-Microsoft Research.
+DevPilot is based on research from Renmin University of China ([paper](https://arxiv.org/pdf/2606.11926), [upstream repository](https://github.com/RUC-NLPIR/DevPilot)).
+
+Maintained by [Osita Miles](https://github.com/mylife-as-miles).

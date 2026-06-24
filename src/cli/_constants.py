@@ -12,12 +12,12 @@ from __future__ import annotations
 # display order. Each is a single-axis value that maps 1:1 onto a backend, so
 # the config file reads the same as the menu. `auto` resolves to one of the
 # concrete three at setup time.
-PROVIDER_CHOICES = ("auto", "openai-responses", "openai-chat", "openai-oauth", "anthropic")
+PROVIDER_CHOICES = ("auto", "openai-responses", "openai-chat", "openai-oauth", "anthropic", "gemini")
 
 # Concrete providers DevPilot can store + serve after `auto` is resolved. `litellm`
 # stays a valid backend for back-compat / advanced hand-edited configs, but is
 # no longer advertised in the menu.
-_BACKEND_PROVIDERS = {"anthropic", "openai-responses", "openai-chat", "openai-oauth", "litellm"}
+_BACKEND_PROVIDERS = {"anthropic", "openai-responses", "openai-chat", "openai-oauth", "litellm", "gemini"}
 VALID_OPENAI_APIS = {"chat", "responses"}
 
 # Intake-agent LLM call budget — seeded into the agent config by ``run`` and
@@ -39,6 +39,9 @@ INTAKE_REASONING_EFFORT = "low"
 DEFAULT_OPENAI_MODEL = "gpt-4o"
 DEFAULT_OPENAI_OAUTH_MODEL = "gpt-5.5"
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"
+
+from ..core.reasoning_effort import DEFAULT_REASONING_EFFORT, REASONING_EFFORT_CHOICES
 
 # Read-only WebUI: the browser monitor binds here by default for interactive
 # runs (no flag needed). If the port is taken we walk the next few ports so a
@@ -50,7 +53,7 @@ WEBUI_PORT_SCAN = 10
 def canonical_provider(provider: str | None, openai_api: str | None = None) -> str:
     """Collapse any provider alias onto a single canonical, single-axis value.
 
-    Returns one of ``auto`` | ``anthropic`` | ``openai-responses`` |
+    Returns one of ``auto`` | ``anthropic`` | ``gemini`` | ``openai-responses`` |
     ``openai-chat`` | ``litellm``. The legacy two-axis form (``openai`` plus
     ``openai_api: chat|responses``) folds into the matching ``openai-*`` value,
     so newly written configs only ever carry the single ``provider`` field.
@@ -61,6 +64,8 @@ def canonical_provider(provider: str | None, openai_api: str | None = None) -> s
         return "auto"
     if p in ("claude", "anthropic"):
         return "anthropic"
+    if p in ("gemini", "google"):
+        return "gemini"
     if p == "litellm":
         return "litellm"
     if p in ("openai-oauth", "chatgpt", "openai_oauth"):
@@ -84,6 +89,35 @@ def default_model_for_provider(provider: str | None) -> str | None:
     canon = canonical_provider(provider)
     if canon == "openai-oauth":
         return DEFAULT_OPENAI_OAUTH_MODEL
+    if canon == "gemini":
+        return DEFAULT_GEMINI_MODEL
     if canon.startswith("openai") or canon == "litellm":
         return DEFAULT_OPENAI_MODEL
     return None
+
+
+def uses_gemini_thinking_level(provider: str | None, model: str | None = None) -> bool:
+    """True when the chosen backend maps ``reasoning_effort`` → Gemini ``thinking_level``."""
+    canon = canonical_provider(provider)
+    if canon == "gemini":
+        return True
+    if canon == "auto":
+        bare = (model or "").rsplit("/", 1)[-1].lower()
+        return bare.startswith("gemini")
+    return False
+
+
+def reasoning_effort_menu(
+    provider: str | None = None,
+    model: str | None = None,
+) -> list[tuple[str, str]]:
+    """Menu rows for setup / config: (value, description)."""
+    gemini = uses_gemini_thinking_level(provider, model)
+    hint = " → thinking_level" if gemini else ""
+    return [
+        ("high", f"most thorough planning — slowest (best quality){hint}: high"),
+        ("medium", f"balanced depth and speed{hint}: medium"),
+        ("low", f"light reasoning — fast, may weaken complex planning{hint}: low"),
+        ("minimal", f"smallest thinking budget — fastest with a little reasoning{hint}: minimal"),
+        ("none", "no reasoning — fastest, lowest quality (omits thinking)"),
+    ]

@@ -17,7 +17,9 @@ from ..._app import GLOBAL_CONFIG_FILE
 from .._constants import (
     DEFAULT_CLAUDE_MODEL,
     default_model_for_provider,
+    reasoning_effort_menu,
 )
+from ...core.reasoning_effort import DEFAULT_REASONING_EFFORT
 from .config_cmd import write_user_llm_config
 
 
@@ -50,6 +52,7 @@ def run_setup_wizard(*, force: bool = False) -> bool:
             ("openai-chat", "any OpenAI-compatible endpoint (DeepSeek / Qwen / GLM / …)"),
             ("openai-oauth", "ChatGPT Plus/Pro subscription via browser login (experimental)"),
             ("anthropic", "Claude via the native Anthropic API"),
+            ("gemini", "Gemini via the Interactions API (thinking + function calling)"),
         ],
         default="auto",
     )
@@ -82,8 +85,11 @@ def run_setup_wizard(*, force: bool = False) -> bool:
     if api_key:
         llm["api_key"] = api_key
 
-    # 5. reasoning effort (reasoning models / Claude thinking budget)
-    llm["reasoning_effort"] = _prompt_reasoning_effort()
+    # 5. reasoning effort (reasoning models / Claude thinking budget / Gemini thinking_level)
+    llm["reasoning_effort"] = _prompt_reasoning_effort(
+        provider=provider,
+        model=model,
+    )
 
     _console.print()
     write_user_llm_config(llm)
@@ -118,7 +124,7 @@ def _setup_openai_oauth() -> bool:
     _console.print(f"[green]✓[/] signed in to ChatGPT — plan=[bold]{plan}[/]")
 
     model = typer.prompt("Model", default=DEFAULT_OPENAI_OAUTH_MODEL).strip() or DEFAULT_OPENAI_OAUTH_MODEL
-    effort = _prompt_reasoning_effort(default="medium")
+    effort = _prompt_reasoning_effort(provider="openai-oauth", model=model, default="medium")
     _console.print()
     write_user_llm_config(
         {"provider": "openai-oauth", "model": model, "reasoning_effort": effort}
@@ -149,16 +155,16 @@ def _probe_credentials(provider: str, api_key: str | None) -> None:
         _console.print("[green]✓[/] credentials look resolvable")
 
 
-def _prompt_reasoning_effort(default: str = "high") -> str:
-    """Pick the reasoning effort (speed vs. depth) for the run loop."""
+def _prompt_reasoning_effort(
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    default: str = DEFAULT_REASONING_EFFORT,
+) -> str:
+    """Pick reasoning effort (speed vs. depth); Gemini maps to ``thinking_level``."""
     return _select_choice(
         "Reasoning effort",
-        options=[
-            ("high", "most thorough planning — slowest (best quality)"),
-            ("medium", "balanced depth and speed"),
-            ("low", "light reasoning — fast, may weaken complex planning"),
-            ("none", "no reasoning — fastest, lowest quality"),
-        ],
+        options=reasoning_effort_menu(provider, model),
         default=default,
     )
 

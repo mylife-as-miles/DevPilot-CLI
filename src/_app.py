@@ -13,10 +13,9 @@ CLI_COMMAND = APP_NAME
 
 # Product taglines, shown on the splash banner and in `--help`. Kept here as a
 # single source of truth so the two surfaces never drift. TAGLINE is the punchy
-# hero line; TAGLINE_SUB explains what the agent actually does (branch → prune →
-# harvest), mirroring the tree/devpilot brand.
-TAGLINE = "Grow evidence, not logs."
-TAGLINE_SUB = "Every hypothesis becomes a branch — pruned if it fails, harvested if it works."
+# hero line; TAGLINE_SUB explains what DevPilot does in plain language.
+TAGLINE = "Autonomous research for your codebase."
+TAGLINE_SUB = "Describe a goal — DevPilot proposes ideas, runs experiments, and keeps what improves your metric."
 
 CONFIG_DIR_NAME = f".{APP_NAME}"
 CONFIG_FILE_NAME = f"{APP_NAME}.yaml"

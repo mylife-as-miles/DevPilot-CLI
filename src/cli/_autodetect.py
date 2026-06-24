@@ -93,6 +93,9 @@ def resolve_auto_provider(
     if bare.startswith(("claude", "anthropic")):
         return "anthropic", "Claude model → native Anthropic Messages API"
 
+    if bare.startswith("gemini"):
+        return "gemini", "Gemini model → native Interactions API"
+
     if probe_responses_api(model=model, base_url=base_url, api_key=api_key, timeout=timeout):
         return (
             "openai-responses",
