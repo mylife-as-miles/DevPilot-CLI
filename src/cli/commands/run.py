@@ -304,6 +304,7 @@ def run_command(
         provider=eff["provider"],
         explicit_api_key=eff["api_key"],
         verbose=verbose_preflight,
+        orbit=final_project_defaults.get("orbit"),
     )
     results = checker.run_all_collect(render=verbose_preflight)
     fatal = [r for r in results if r.status == "fail"]
@@ -693,6 +694,12 @@ def _launch_param_rows(config: Any, session_dir: Path, lang: str,
     plugin = getattr(config, "plugin", None)
     if plugin is not None and getattr(plugin, "name", None):
         rows.append((t(lang, "plugin"), str(plugin.name)))
+    orbit = getattr(config, "orbit", None)
+    if orbit is not None and getattr(orbit, "enabled", False):
+        orbit_value = str(getattr(orbit, "mode", "local"))
+        if getattr(orbit, "required", False):
+            orbit_value += " (required)"
+        rows.append(("Orbit", orbit_value))
     if unloaded_skills:
         rows.append((t(lang, "skills"), "unloaded: " + ", ".join(unloaded_skills)))
     rows.append((t(lang, "interaction_mode"), str(config.ui.interaction_mode)))

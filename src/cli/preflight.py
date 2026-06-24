@@ -16,7 +16,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import typer
 
@@ -44,11 +44,13 @@ class PreflightChecker:
 
     def __init__(self, cwd: Path, provider: str | None,
                  explicit_api_key: str | None = None,
-                 *, verbose: bool = False) -> None:
+                 *, verbose: bool = False,
+                 orbit: Any | None = None) -> None:
         self.cwd = cwd.resolve()
         self.provider = (provider or "anthropic").lower()
         self.explicit_api_key = explicit_api_key
         self.verbose = verbose
+        self.orbit = orbit
 
     def run_all(self) -> bool:
         """Print results and return True iff none failed (legacy)."""
@@ -84,6 +86,8 @@ class PreflightChecker:
             self._check_git,
             self._check_eval,
         ]
+        if self._orbit_enabled():
+            checks.append(self._check_orbit)
         results: list[CheckResult] = []
         for check in checks:
             result = check()
@@ -241,3 +245,52 @@ class PreflightChecker:
             f"no eval script found ({', '.join(self.EVAL_CANDIDATES)})",
             hint="create one (a command that prints a numeric score), or rely on the agent to find one",
         )
+
+    # â”€â”€ Check 5: GitLab Orbit knowledge graph â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    def _orbit_value(self, key: str, default: Any = None) -> Any:
+        if self.orbit is None:
+            return default
+        if isinstance(self.orbit, dict):
+            return self.orbit.get(key, default)
+        return getattr(self.orbit, key, default)
+
+    def _orbit_enabled(self) -> bool:
+        return bool(self._orbit_value("enabled", False))
+
+    def _orbit_required(self) -> bool:
+        return bool(self._orbit_value("required", False))
+
+    def _orbit_status(self, status: str, message: str, hint: str | None = None) -> CheckResult:
+        if status == "warn" and self._orbit_required():
+            status = "fail"
+        return CheckResult("orbit", status, message, hint=hint)
+
+    def _check_orbit(self) -> CheckResult:
+        mode = str(self._orbit_value("mode", "local") or "local").lower()
+        command = str(self._orbit_value("command", "orbit") or "orbit").strip()
+        executable = command.split()[0] if command else "orbit"
+        if shutil.which(executable) is None:
+            return self._orbit_status(
+                "warn",
+                f"enabled but `{executable}` is not installed",
+                hint=(
+                    "install Orbit Local: "
+                    "irm https://gitlab.com/gitlab-org/orbit/knowledge-graph/-/raw/main/install.ps1 | iex"
+                ),
+            )
+
+        if mode == "remote":
+            group = self._orbit_value("remote_group")
+            suffix = f" for group {group}" if group else ""
+            return CheckResult("orbit", "pass", f"remote mode configured{suffix}")
+
+        db_path = self._orbit_value("database_path")
+        graph = Path(os.path.expanduser(str(db_path or "~/.orbit/graph.duckdb")))
+        if not graph.exists():
+            return self._orbit_status(
+                "warn",
+                f"local graph not found at {graph}",
+                hint=f"run `{command} index {self.cwd}` before starting DevPilot",
+            )
+        return CheckResult("orbit", "pass", f"local graph found at {graph}")

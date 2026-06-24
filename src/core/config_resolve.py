@@ -93,7 +93,7 @@ def _warn_unknown_mapping_keys(
 
 
 def _warn_unknown_nested_blocks(mapping: dict[str, Any], *, location: str) -> None:
-    from ..coordinator.config import BudgetPolicy, SearchConfig
+    from ..coordinator.config import BudgetPolicy, OrbitConfig, SearchConfig
     from ..coordinator.convergence import ConvergenceConfig
     from .config_schema import ContextConfig, LLMConfig, TimeoutConfig, UIConfig
 
@@ -106,6 +106,7 @@ def _warn_unknown_nested_blocks(mapping: dict[str, Any], *, location: str) -> No
             "total_time_budget", "time_budget", "run_training_default", "run_training_max",
         },
         "search": set(SearchConfig.model_fields),
+        "orbit": set(OrbitConfig.model_fields),
         "convergence": set(ConvergenceConfig.model_fields),
     }
     for block, allowed in block_fields.items():

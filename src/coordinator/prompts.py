@@ -18,6 +18,7 @@ def build_coordinator_system_prompt(config: CoordinatorConfig) -> str:
         _identity_section(),
         _plugin_preamble_inject(config),
         _system_section(),
+        _orbit_section(config),
         _budget_policy_section(config),
         _devpilot_cycle_protocol_section(config),
         _idea_interaction_section(config),
@@ -145,6 +146,55 @@ and do not launch new executors or merges until a resume note arrives.
 - Use Github-flavored markdown for reasoning output.
 - If a tool call fails, adjust your approach rather than retrying the \
 exact same call."""
+
+
+def _orbit_section(config: CoordinatorConfig) -> str:
+    orbit = getattr(config, "orbit", None)
+    if orbit is None or not orbit.enabled:
+        return ""
+
+    mode = orbit.mode
+    command = orbit.command or "orbit"
+    graph = orbit.database_path or "~/.orbit/graph.duckdb"
+    required = "required" if orbit.required else "best-effort"
+    refresh = ""
+    local = ""
+    if mode == "local":
+        local = (
+            f"- For Orbit Local, the graph is expected at `{graph}` and the CLI command is "
+            f"`{command}`. Query it through shell tools when you need graph context.\n"
+        )
+    if mode == "local" and orbit.refresh_before_run:
+        index = orbit.index_command or f"{command} index {config.cwd}"
+        refresh = (
+            f"- At the start of OBSERVE, refresh the Orbit Local index with `{index}` "
+            "before using query results.\n"
+        )
+    remote = ""
+    if mode == "remote":
+        group = orbit.remote_group or "(configured GitLab group)"
+        remote = (
+            f"- Orbit Remote is scoped to `{group}`. Use it for SDLC questions "
+            "about merge requests, pipelines, reviewers, work items, security findings, "
+            "and cross-project dependencies.\n"
+        )
+
+    return f"""\
+# GitLab Orbit Knowledge Graph
+
+Orbit is enabled for this run (`mode={mode}`, `{required}`). Treat it as an
+important discovery process before you spend Executor cycles.
+
+- Use Orbit for structural questions: what calls what, what depends on this
+  file or symbol, which code areas are related, and which prior changes matter.
+- Orbit is analytical and point-in-time. Use its results as evidence from the
+  last index cycle, then verify risky runtime behavior with experiments.
+- Prefer Orbit over broad text search when the question is graph-shaped. Use
+  literal search only for strings, log messages, comments, or after Orbit gives
+  you a focused file/symbol.
+{local}{refresh}{remote}- If Orbit is unavailable and it is required, stop and ask the user to index or
+  configure it. If it is best-effort, continue with the normal code tools but
+  record that Orbit evidence was unavailable."""
 
 
 def _budget_policy_section(config: CoordinatorConfig) -> str:
