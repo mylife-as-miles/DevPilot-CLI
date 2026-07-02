@@ -136,5 +136,7 @@ def get_coordinator_tools(
             )
             tools.append(SearchStatusTool(cwd=cwd, workspace_dir=wdir))
 
+    from ...core.tools.reach.runtime_tools import get_reach_tools
+    tools.extend(get_reach_tools(cwd=cwd, workspace_dir=wdir, config=config))
     return tools
 

@@ -317,6 +317,7 @@ async def _build_and_run_executor_agent(
 
     try:
         executor_config = config.to_executor_config(node_id, node.hypothesis)
+        executor_config.cycle_id = str(_completed_cycles(tree) + 1)
         executor_config.cwd = str(worktree_path)
         executor_config.event_bus = tree.bus
         if resume and extra_turns:

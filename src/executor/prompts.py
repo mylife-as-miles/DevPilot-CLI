@@ -43,6 +43,7 @@ def build_system_prompt(config: AgentConfig, plugin: "Plugin | None" = None) -> 
         _budget_policy_section(config),
         _experiment_workflow_section(config, plugin),
         _environment_section(config),
+        _reach_evidence_section(config),
     ]
     return "\n\n".join(s for s in sections if s)
 
@@ -435,3 +436,51 @@ You have been invoked in the following environment:
  - Shell: {shell}
  - Python: {platform.python_version()}
  - OS Version: {os_version}"""
+
+
+def _reach_evidence_section(config: AgentConfig) -> str:
+    if not config.workspace_dir:
+        return ""
+
+    from ..core.tools.reach.evidence import list_reach_evidence
+
+    records = list_reach_evidence(config.workspace_dir)
+    if not records:
+        return ""
+
+    current_node = config.node_id
+    relevant_records = []
+    other_records = []
+
+    for r in records:
+        if current_node and r.get("hypothesis_id") == current_node:
+            relevant_records.append(r)
+        else:
+            other_records.append(r)
+
+    # Show at most 5 relevant records and fill with others up to 5 total
+    selected = relevant_records[:5]
+    if len(selected) < 5:
+        selected.extend(other_records[:(5 - len(selected))])
+
+    if not selected:
+        return ""
+
+    lines = [
+        "# Reach Research Evidence",
+        "The following internet research evidence has been collected in this run. Use it for context:",
+    ]
+    for r in selected:
+        tool = r.get("tool", "")
+        source = r.get("source", "")
+        title = r.get("title")
+        title_s = f" ({title})" if title else ""
+        content = r.get("content", "").strip()
+        excerpt = content[:150].replace("\n", " ").strip()
+        if len(content) > 150:
+            excerpt += "..."
+        node_s = f" [node: {r.get('hypothesis_id')}]" if r.get("hypothesis_id") else ""
+        lines.append(f"- `{tool}` on {source}{title_s}{node_s}:")
+        lines.append(f"  > {excerpt}")
+
+    return "\n".join(lines)

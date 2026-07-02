@@ -28,6 +28,7 @@ def build_coordinator_system_prompt(config: CoordinatorConfig) -> str:
         _environment_section(config),
         _related_work_annotation_section(config),
         _ask_user_section(config),
+        _reach_evidence_section(config),
     ]
     return "\n\n".join(s for s in sections if s)
 
@@ -754,7 +755,7 @@ visited pages never enter your own context window.
 2. The call returns immediately (or `[skipped]` if the gate refuses).
    Continue normal work: more IDEATE / RunExecutor / Bash.
 3. When you are about to `GitMergeBranch`, check the annotation via
-   `TreeView(format="node", node_id="<id>")`. If the SearchAgent came
+   `TreeView(format=\"node\", node_id=\"<id>\")`. If the SearchAgent came
    back with `prior-art-exists`, decide whether to merge anyway (the
    experiment still won on the metric) or mark the node with a note.
 4. A `[search-failed: ...]` marker means the search couldn't complete —
@@ -829,3 +830,33 @@ write a short note like `[search-failed: no relevant results for X queries]` \
 into `related_work` and move on. A failed annotation never blocks dispatch."""
 
 
+def _reach_evidence_section(config: CoordinatorConfig) -> str:
+    if not config.workspace_dir:
+        return ""
+
+    from ..core.tools.reach.evidence import list_reach_evidence
+
+    records = list_reach_evidence(config.workspace_dir)
+    if not records:
+        return ""
+
+    selected = records[:8]
+
+    lines = [
+        "## Reach Research Evidence",
+        "The following internet research evidence has been collected in this run. Use it for context:",
+    ]
+    for r in selected:
+        tool = r.get("tool", "")
+        source = r.get("source", "")
+        title = r.get("title")
+        title_s = f" ({title})" if title else ""
+        content = r.get("content", "").strip()
+        excerpt = content[:150].replace("\n", " ").strip()
+        if len(content) > 150:
+            excerpt += "..."
+        node_s = f" [node: {r.get('hypothesis_id')}]" if r.get("hypothesis_id") else ""
+        lines.append(f"- `{tool}` on {source}{title_s}{node_s}:")
+        lines.append(f"  > {excerpt}")
+
+    return "\n".join(lines)

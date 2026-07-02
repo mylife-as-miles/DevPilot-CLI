@@ -5,14 +5,14 @@
 <h1 align="center">DevPilot</h1>
 
 <p align="center">
-  <strong>Autonomous research for your codebase.</strong><br>
+  <strong>Autonomous research for your codebase -- driven by the Idea Tree.</strong><br>
   Describe a goal — DevPilot proposes ideas, runs experiments, and keeps what improves your metric.
 </p>
 
 <p align="center">
   <a href="https://arxiv.org/pdf/2606.11926">Paper</a> ·
-  <a href="https://RUC-NLPIR.github.io/DevPilot/">Project page</a> ·
-  <a href="https://RUC-NLPIR.github.io/DevPilot/docs/">Documentation</a> ·
+  <a href="https://github.com/mylife-as-miles/DevPilot-CLI">Repository</a> ·
+  <a href="docs/index.md">Documentation</a> ·
   <a href="LICENSE">License</a>
 </p>
 
@@ -29,7 +29,7 @@ DevPilot is an autonomous research agent that turns a long-horizon objective int
 
 Instead of one-shot attempts that forget what failed, DevPilot grows a **hypothesis tree**: every idea becomes a branch — pruned if it fails, harvested if it works — and insights propagate so later ideas start smarter.
 
-This repository is a maintained CLI distribution of [DevPilot](https://github.com/RUC-NLPIR/DevPilot), with first-class support for **Google Gemini** via the Interactions API, alongside Anthropic, OpenAI, and OpenAI-compatible backends.
+This repository is a maintained CLI distribution of [DevPilot](https://github.com/RUC-NLPIR/DevPilot), published as **`miles-devpilot-cli`**. It adds first-class support for **Google Gemini** via the Interactions API, OpenAI OAuth login, GitLab Orbit knowledge-graph context, and the existing Anthropic, OpenAI, and OpenAI-compatible backends.
 
 ## Features
 
@@ -211,6 +211,31 @@ devpilot config init --force  # non-interactive reconfiguration
 
 Set via `ui.interaction_mode` in your project config or the appropriate CLI flag.
 
+### GitLab Orbit
+
+DevPilot can use GitLab Orbit as an optional knowledge-graph discovery step before launching Executors. Orbit is useful for questions like "what depends on this file?", "which services call this symbol?", "which merge requests touched this area?", and "what pipelines or security findings are connected to this change?"
+
+Enable Orbit Local in `devpilot.yaml` or `research_config.yaml` after indexing the repository:
+
+```yaml
+orbit:
+  enabled: true
+  mode: local
+  command: orbit
+  database_path: ~/.orbit/graph.duckdb
+```
+
+Make it required for GitLab-backed runs:
+
+```yaml
+orbit:
+  enabled: true
+  mode: local
+  required: true
+```
+
+See [GitLab Orbit](docs/orbit.md) for Local and Remote setup.
+
 ## CLI reference
 
 | Command | Description |
@@ -240,6 +265,42 @@ Interrupted runs can be resumed:
 devpilot --resume --run-name <run_name>
 ```
 
+## DevPilot Reach
+
+DevPilot Reach is an optional internet research capability layer. It provides safe no-login channels natively and can bridge to [Agent Reach](https://github.com/Panniantong/agent-reach) when installed.
+
+**Phase 1** supports web, search, GitHub, YouTube, and RSS channels. Cookie/login platforms (Twitter, Reddit, Instagram, etc.) are not implemented in Phase 1.
+
+```bash
+# Diagnostics
+devpilot reach doctor
+devpilot reach providers
+
+# Native channels
+devpilot reach visit https://example.com --max-chars 6000
+devpilot reach search "transformer architecture"
+devpilot reach github repo openai/openai-python
+devpilot reach youtube "https://youtube.com/watch?v=..."
+devpilot reach rss https://hnrss.org/frontpage
+
+# Agent Reach bridge (optional)
+devpilot reach agent-reach status
+devpilot reach agent-reach doctor
+devpilot reach agent-reach install-help
+devpilot reach agent-reach update-help
+```
+
+**Agent Reach** can be installed separately.  OpenClaw users need exec/coding permissions before asking OpenClaw to install Agent Reach — run `devpilot reach agent-reach install-help` for details.
+
+**Runtime integration**: Reach channels are also exposed as read-only agent tools (`reach_search`, `reach_visit`, `reach_github_repo`, `reach_youtube_transcript`, `reach_rss_read`) so the Coordinator and Executor can call them during autonomous research runs.  These tools are registered automatically and gracefully handle missing optional dependencies.
+
+**Evidence Store**: When Reach tools are called within an active research session, their outputs are persisted as structured evidence in a JSONL file (`reach_evidence.jsonl`) under the active run's session directory (e.g. `<session_dir>/reach_evidence.jsonl`). Each record contains:
+*   Tool name, query/input, and source URL or identifier
+*   Retrieved timestamp, content/excerpt, and page title (if available)
+*   Attributed `cycle_id` and `hypothesis_id` (idea ID) if called from a runtime executor context
+
+This evidence store serves as a structured, read-only reference of all internet research performed during the lifetime of a research run. If run outside of a session context (e.g. via direct CLI commands), the tools bypass evidence persistence.
+
 ## CLI vs. Agent Skills
 
 | | Native CLI | Agent Skill Suite |
@@ -265,12 +326,13 @@ src/                    # imported as the `devpilot` package
 
 ## Documentation
 
-Detailed guides are available in [`docs/`](docs/index.md) and on the [project documentation site](https://RUC-NLPIR.github.io/DevPilot/docs/):
+Detailed guides are available in [`docs/`](docs/index.md):
 
 - [Quickstart](docs/quickstart.md)
 - [Configuration](docs/configuration.md)
 - [Preparing a benchmark](docs/preparing-a-benchmark.md)
 - [Interaction modes](docs/interaction-modes.md)
+- [GitLab Orbit](docs/orbit.md)
 - [Outputs and resume](docs/outputs-and-resume.md)
 - [Plugins](docs/plugins.md)
 
