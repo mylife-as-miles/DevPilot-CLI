@@ -1,0 +1,121 @@
+site_name: DevPilot
+site_description: Toward Generalist Autonomous Research via Hypothesis-Tree Refinement
+site_url: https://RUC-NLPIR.github.io/DevPilot/docs/
+repo_url: https://github.com/RUC-NLPIR/DevPilot
+repo_name: RUC-NLPIR/DevPilot
+edit_uri: edit/main/docs/
+copyright: Renmin University of China · Microsoft Research
+
+theme:
+  name: material
+  favicon: assets/logo_black.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.indexes
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: installation.md
+      - Quickstart: quickstart.md
+      - Preparing a Benchmark: preparing-a-benchmark.md
+  - Concepts:
+      - How It Works: how-it-works.md
+  - Guides:
+      - Configuration: configuration.md
+      - Interaction Modes: interaction-modes.md
+      - Web UI & Monitoring: web-ui.md
+      - Plugins: plugins.md
+      - Skills: skills.md
+      - Outputs & Resume: outputs-and-resume.md
+  - Reference:
+      - CLI: cli.md
+  - Contributing: contributing.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - def_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: zh
+          name: 简体中文
+          build: true
+          nav_translations:
+            Home: 首页
+            Getting Started: 快速开始
+            Installation: 安装
+            Quickstart: 快速上手
+            Preparing a Benchmark: 准备基准
+            Concepts: 概念
+            How It Works: 工作原理
+            Guides: 指南
+            Configuration: 配置
+            Interaction Modes: 交互模式
+            Web UI & Monitoring: Web UI 与监控
+            Plugins: 插件
+            Skills: 技能
+            Outputs & Resume: 输出与续跑
+            Reference: 参考
+            Contributing: 贡献
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/RUC-NLPIR/DevPilot
