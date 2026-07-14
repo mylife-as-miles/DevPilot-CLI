@@ -1,0 +1,120 @@
+[project]
+name = "devpilot-agent"
+dynamic = ["version"]
+description = "DevPilot — an autonomous research agent that proposes ideas, edits code, runs experiments, and iterates on a hypothesis tree."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+keywords = ["ai", "agent", "autonomous-research", "llm", "experimentation"]
+authors = [{ name = "Jiajie Jin", email = "jinjiajie@ruc.edu.cn" }]
+dependencies = [
+    "anthropic>=0.52.0",
+    "openai>=1.30.0",
+    "litellm>=1.55.0",
+    "httpx>=0.27.0",
+    "tiktoken>=0.7.0",
+    "typer>=0.12.0",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+    "prompt-toolkit>=3.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/RUC-NLPIR/DevPilot"
+Repository = "https://github.com/RUC-NLPIR/DevPilot"
+Issues = "https://github.com/RUC-NLPIR/DevPilot/issues"
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocs-static-i18n>=1.2",
+]
+
+[project.scripts]
+devpilot = "devpilot.cli.app:main"
+executor = "devpilot.executor.main:cli"
+coordinator = "devpilot.coordinator.main:cli"
+run-research = "devpilot.run:cli"
+review-research = "devpilot.review:cli"
+
+[build-system]
+requires = ["setuptools>=77.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+# Version is derived automatically from the latest git tag (e.g. tag
+# `v0.2.0` -> version `0.2.0`). Never hard-code `version` here again; just
+# push a `v*` tag and CI publishes that version. `fallback_version` is only
+# used for local builds when no tag/git history is available.
+[tool.setuptools_scm]
+fallback_version = "0.1.0"
+
+# The code lives in `src/` on disk but is imported as the `devpilot`
+# package, so we map the package root with `package-dir` and list the
+# sub-packages explicitly (auto-discovery can't rename `src/` -> the import
+# name). Add new sub-packages here when you create them.
+[tool.setuptools]
+package-dir = { "devpilot" = "src" }
+packages = [
+    "devpilot",
+    "devpilot.cli",
+    "devpilot.cli.commands",
+    "devpilot.cli.intake",
+    "devpilot.coordinator",
+    "devpilot.coordinator.tools",
+    "devpilot.core",
+    "devpilot.core.llm",
+    "devpilot.core.tools",
+    "devpilot.core.tools.web",
+    "devpilot.events",
+    "devpilot.events.subscribers",
+    "devpilot.executor",
+    "devpilot.plugins",
+    "devpilot.report",
+    "devpilot.search_agent",
+    "devpilot.webui",
+]
+
+[tool.setuptools.package-data]
+"devpilot" = ["skills/*.md", "py.typed"]
+"devpilot.webui" = ["index.html"]
+"devpilot.plugins" = ["*.yaml", "*.yml"]
+
+# ── Dev tooling ──────────────────────────────────────────────────────
+# Install with: `uv sync --group dev`  (or `pip install -e ".[dev]"` is NOT
+# enough — these live in a dependency group, use uv or `pip install <names>`).
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "types-PyYAML",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Tests map the `devpilot` package onto `src/` themselves, so no install is needed.
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py310"
+# Match the existing codebase: long lines are common and intentional, so we
+# keep ruff's default rule set (pyflakes `F` + a subset of pycodestyle `E`)
+# rather than enabling line-length or import-sorting churn.
+extend-exclude = ["project_page", "site", "assets"]
+
+[tool.ruff.lint.per-file-ignores]
+# run_dashboard.py is a compact TUI key dispatcher that deliberately uses
+# `action(); return` one-liners throughout — respect that local idiom.
+"src/cli/run_dashboard.py" = ["E702"]
+
+[tool.mypy]
+# Advisory only for now: the codebase is large and largely untyped, so mypy
+# runs non-blocking in CI. Tighten these as type coverage grows.
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = false
+warn_redundant_casts = true
+exclude = ["project_page", "site", "tests"]
