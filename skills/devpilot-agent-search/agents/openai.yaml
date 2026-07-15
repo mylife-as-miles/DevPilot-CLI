@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Search Context"
+  short_description: "Adds related-work context to DevPilot nodes"
+  default_prompt: "Use $devpilot-agent-search to attach related-work context to validated DevPilot nodes."
