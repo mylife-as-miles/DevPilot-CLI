@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot Setup Intake"
+  short_description: "Builds DevPilot contracts and session state"
+  default_prompt: "Use $devpilot-agent-setup-intake to create the DevPilot run contract and session state."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevPilot State Tools"
+  short_description: "Provides deterministic DevPilot helper tools"
+  default_prompt: "Use $devpilot-agent-tools to emulate DevPilot tree, eval, merge, and report tools locally."
