@@ -194,6 +194,8 @@ def _provider_label(provider: LLMProvider) -> str:
     name = provider.__class__.__name__.lower()
     if "claude" in name:
         return "claude"
+    if "gemini" in name:
+        return "gemini"
     if "openai" in name:
         return "openai"
     return name.replace("provider", "") or "unknown"
@@ -231,7 +233,7 @@ async def _read_user_line(session: PromptSession) -> str:
     inside an already-active asyncio event loop. Calling the sync prompt()
     from inside a running loop raises RuntimeError.
     """
-    prompt = ANSI("\033[1;32myou\033[0m \033[2m›\033[0m ")
+    prompt = ANSI("\033[38;2;244;140;37m\033[1myou\033[0m \033[2m›\033[0m ")
     return await session.prompt_async(prompt)
 
 
@@ -408,25 +410,25 @@ def _available_plugin_summaries(starting_cwd: Path | None) -> list[tuple[str, st
 
 # ── Slash-menu styling ─────────────────────────────────────────────
 #
-# Matches the welcome banner's cyan→magenta accent. Idle rows are dim
-# grey with a cyan command name; selected row inverts to a saturated
-# magenta background so it pops without being garish.
+# Matches the welcome banner's warm orange accent. Idle rows are dim
+# grey with a primary-orange command name; selected row inverts to a
+# saturated orange background so it pops without being garish.
 _MENU_STYLE = Style.from_dict({
     # Menu container & padding
     "completion-menu":                              "bg:#1c1c1c",
-    "completion-menu.border":                       "fg:#5fafff bg:#1c1c1c",
+    "completion-menu.border":                       "fg:#ffb15a bg:#1c1c1c",
 
     # Idle row
-    "completion-menu.completion":                   "bg:#1c1c1c fg:#5fd7ff",
+    "completion-menu.completion":                   "bg:#1c1c1c fg:#f48c25",
     "completion-menu.meta.completion":              "bg:#1c1c1c fg:#808080",
 
-    # Selected row — magenta highlight
-    "completion-menu.completion.current":           "bg:#af00d7 fg:#ffffff bold",
-    "completion-menu.meta.completion.current":      "bg:#af00d7 fg:#ffd7ff",
+    # Selected row — orange highlight
+    "completion-menu.completion.current":           "bg:#c85f0e fg:#ffffff bold",
+    "completion-menu.meta.completion.current":      "bg:#c85f0e fg:#ffd7a8",
 
     # Scrollbar (visible only when list overflows)
     "scrollbar.background":                         "bg:#1c1c1c",
-    "scrollbar.button":                             "bg:#5fafff",
+    "scrollbar.button":                             "bg:#f48c25",
 })
 
 
@@ -459,7 +461,7 @@ def _print_welcome(seed: str | None, *, starting_cwd: Path,
 
     # ── divider + hint ───────────────────────────────────────────────
     _console.print()
-    _console.rule(style="dim cyan")
+    _console.rule(style="dim #f48c25")
     _console.print(
         "  [dim]Tell me what you want to research, or [/dim][bold]/resume[/bold]"
         "[dim] a past run. Type [/dim][bold]/help[/bold][dim] for commands, "

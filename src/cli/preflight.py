@@ -110,6 +110,7 @@ class PreflightChecker:
     _PROVIDER_ENV = {
         "auto": None,      # backend chosen from the model name; either key works
         "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"),
+        "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
         "openai": ("OPENAI_API_KEY",),
         "openai-responses": ("OPENAI_API_KEY",),
         "openai-chat": ("OPENAI_API_KEY",),

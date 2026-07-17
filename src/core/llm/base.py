@@ -106,14 +106,19 @@ class ToolResultBlock:
     tool_use_id: str
     content: str
     is_error: bool = False
+    name: str = ""
 
     def to_content_block(self) -> dict[str, Any]:
-        return {
+        block: dict[str, Any] = {
             "type": "tool_result",
             "tool_use_id": self.tool_use_id,
             "content": self.content,
-            **({"is_error": True} if self.is_error else {}),
         }
+        if self.name:
+            block["name"] = self.name
+        if self.is_error:
+            block["is_error"] = True
+        return block
 
 
 # ---------------------------------------------------------------------------

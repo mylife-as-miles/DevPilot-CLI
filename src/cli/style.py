@@ -11,6 +11,7 @@ both surfaces.
 
 from __future__ import annotations
 
+import os
 from typing import Iterable
 
 from rich.console import Console
@@ -132,21 +133,25 @@ def render_logo(target: "Console | None" = None) -> None:
     ``target`` overrides the console (the intake REPL renders through its own);
     defaults to the shared module console.
     """
+    # Let users opt out of the large ASCII splash.
+    if os.environ.get("DEVPILOT_HIDE_LOGO", "").strip().lower() in {"1", "true", "yes"}:
+        return
+
     from rich.align import Align
 
     from .._app import TAGLINE, TAGLINE_SUB
 
     con = target if target is not None else console
-    # ASCII brand block: ANSI-shadow letters, cyan→magenta diagonal gradient.
+    # ASCII brand block: ANSI-shadow letters, warm orange gradient (DevPilot).
     art = [
-        " █████╗ ██████╗ ██████╗  ██████╗ ██████╗ ",
-        "██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗",
-        "███████║██████╔╝██████╔╝██║   ██║██████╔╝",
-        "██╔══██║██╔══██╗██╔══██╗██║   ██║██╔══██╗",
-        "██║  ██║██║  ██║██████╔╝╚██████╔╝██║  ██║",
-        "╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝",
+        "██████╗ ███████╗██╗   ██╗██████╗ ██╗██╗      ██████╗ ████████╗",
+        "██╔══██╗██╔════╝██║   ██║██╔══██╗██║██║     ██╔═══██╗╚══██╔══╝",
+        "██║  ██║█████╗  ██║   ██║██████╔╝██║██║     ██║   ██║   ██║   ",
+        "██║  ██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║██║     ██║   ██║   ██║   ",
+        "██████╔╝███████╗ ╚████╔╝ ██║     ██║███████╗╚██████╔╝   ██║   ",
+        "╚═════╝ ╚══════╝  ╚═══╝  ╚═╝     ╚═╝╚══════╝ ╚═════╝    ╚═╝   ",
     ]
-    palette = ["#5fd7ff", "#5fafff", "#af87ff", "#d75fff", "#ff5fd7"]
+    palette = ["#ffd7a8", "#ffb15a", "#f48c25", "#e07010", "#c85f0e"]
 
     con.print()
     for row, line in enumerate(art):

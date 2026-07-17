@@ -145,7 +145,7 @@ class LLMConfig(BaseModel):
     api_key: str | None = None
     base_url: str | None = None  # for OpenAI-compatible endpoints
     openai_api: str = "responses"  # legacy second axis for provider=openai
-    reasoning_effort: str | None = "high"  # low|medium|high (Claude maps to budget)
+    reasoning_effort: str | None = "high"  # high|medium|low|minimal|none
     reasoning_summary: str | None = "auto"
     text_verbosity: str | None = "medium"
     parallel_tool_calls: bool | None = True

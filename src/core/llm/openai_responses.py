@@ -13,6 +13,8 @@ from typing import Any
 import tiktoken
 from openai import AsyncOpenAI
 
+from ..reasoning_effort import openai_reasoning_effort
+
 from .base import (
     ContentBlock,
     LLMProvider,
@@ -124,8 +126,9 @@ class OpenAIResponsesProvider(LLMProvider):
 
     def _build_reasoning_config(self) -> dict[str, Any] | None:
         reasoning: dict[str, Any] = {}
-        if self.reasoning_effort is not None:
-            reasoning["effort"] = self.reasoning_effort
+        effort = openai_reasoning_effort(self.reasoning_effort)
+        if effort is not None:
+            reasoning["effort"] = effort
         if self.reasoning_summary is not None:
             reasoning["summary"] = self.reasoning_summary
         return reasoning or None

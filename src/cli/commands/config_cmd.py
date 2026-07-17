@@ -16,6 +16,7 @@ from .._constants import (
     canonical_provider,
     default_model_for_provider,
 )
+from ...core.reasoning_effort import DEFAULT_REASONING_EFFORT, REASONING_EFFORT_CHOICES
 
 
 config_app = typer.Typer(
@@ -57,6 +58,12 @@ def init_command(
                                         help="e.g. http://localhost:4141 for local proxies"),
     api_key: str | None = typer.Option(None, "--api-key",
                                        help="overrides env var; leave empty to keep env-based auth"),
+    reasoning_effort: str = typer.Option(
+        DEFAULT_REASONING_EFFORT,
+        "--reasoning-effort",
+        help="Reasoning depth: high / medium / low / minimal / none "
+             "(Gemini maps to thinking_level).",
+    ),
     force: bool = typer.Option(False, "--force", help="overwrite existing config"),
 ) -> None:
     """Generate the user config file with the given LLM settings.
@@ -89,6 +96,16 @@ def init_command(
         )
         raise typer.Exit(code=2)
 
+    effort = reasoning_effort.strip().lower()
+    if effort not in REASONING_EFFORT_CHOICES:
+        typer.secho(
+            "error: --reasoning-effort must be one of "
+            f"{' / '.join(REASONING_EFFORT_CHOICES)} (got {reasoning_effort!r})",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
     if GLOBAL_CONFIG_FILE.exists() and not force:
         typer.secho(f"error: {GLOBAL_CONFIG_FILE} already exists. Use --force to overwrite.",
                     fg=typer.colors.RED, err=True)
@@ -97,7 +114,11 @@ def init_command(
     GLOBAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
     resolved_model = model or default_model_for_provider(canon) or DEFAULT_CLAUDE_MODEL
-    llm: dict[str, str] = {"provider": canon, "model": resolved_model}
+    llm: dict[str, str] = {
+        "provider": canon,
+        "model": resolved_model,
+        "reasoning_effort": effort,
+    }
     if base_url:
         llm["base_url"] = base_url
     if api_key:

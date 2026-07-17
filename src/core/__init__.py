@@ -32,15 +32,16 @@ __all__ = [
 def resolve_backend(provider: str | None, openai_api: str | None, model: str | None, base_url: str | None) -> str:
     """Collapse the (provider, openai_api) config onto one backend id.
 
-    Returns one of: ``anthropic`` | ``openai-oauth`` | ``openai-responses`` |
-    ``openai-chat`` | ``litellm``. ``provider="auto"`` (the default) routes by
-    model name:
-    a ``claude*`` model on the default endpoint uses the native Anthropic
-    backend (prompt caching); everything else uses litellm.
+    Returns one of: ``anthropic`` | ``gemini`` | ``openai-oauth`` |
+    ``openai-responses`` | ``openai-chat`` | ``litellm``. ``provider="auto"``
+    (the default) routes by model name: ``claude*`` → Anthropic, ``gemini*`` →
+    Gemini Interactions API; everything else uses litellm.
     """
     p = (provider or "auto").lower()
     if p in ("claude", "anthropic"):
         return "anthropic"
+    if p in ("gemini", "google"):
+        return "gemini"
     if p in ("openai-oauth", "chatgpt", "openai_oauth"):
         return "openai-oauth"
     if p in ("openai-responses", "responses"):
@@ -55,6 +56,8 @@ def resolve_backend(provider: str | None, openai_api: str | None, model: str | N
         bare = (model or "").rsplit("/", 1)[-1].lower()
         if bare.startswith(("claude", "anthropic")) and not base_url:
             return "anthropic"
+        if bare.startswith("gemini") and not base_url:
+            return "gemini"
         return "litellm"
     return "litellm"  # unknown → most flexible path
 
@@ -66,6 +69,16 @@ def create_provider(config: AgentConfig) -> LLMProvider:
     """
     backend = resolve_backend(config.provider, config.openai_api, config.model, config.base_url)
 
+    if backend == "gemini":
+        from .llm.gemini import GeminiInteractionsProvider
+        return GeminiInteractionsProvider(
+            model=config.model,
+            api_key=config.api_key,
+            base_url=config.base_url,
+            max_retries=config.llm_provider_retries,
+            timeout=config.llm_timeout,
+            reasoning_effort=config.reasoning_effort,
+        )
     if backend == "anthropic":
         from .llm.claude import ClaudeProvider
         return ClaudeProvider(

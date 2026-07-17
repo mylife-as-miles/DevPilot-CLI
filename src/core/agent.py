@@ -605,6 +605,7 @@ class Agent:
         if tool is None:
             return ToolResultBlock(
                 tool_use_id=tc.id,
+                name=tc.name,
                 content=f"Error: Unknown tool '{tc.name}'. Available tools: {', '.join(self.tools.keys())}",
                 is_error=True,
             )
@@ -631,7 +632,7 @@ class Agent:
                 "agent": self.config.agent_label,
                 "node_id": self.config.node_id,
             })
-            return ToolResultBlock(tool_use_id=tc.id, content=output)
+            return ToolResultBlock(tool_use_id=tc.id, name=tc.name, content=output)
         except Exception as e:
             error_msg = f"Tool execution error: {type(e).__name__}: {e}"
             log.error("Tool %s failed: %s", tc.name, error_msg)
@@ -644,7 +645,7 @@ class Agent:
                 "agent": self.config.agent_label,
                 "node_id": self.config.node_id,
             })
-            return ToolResultBlock(tool_use_id=tc.id, content=error_msg, is_error=True)
+            return ToolResultBlock(tool_use_id=tc.id, name=tc.name, content=error_msg, is_error=True)
 
     def _emit_event(self, event_type: str, data: dict[str, Any]) -> None:
         bus = self.config.event_bus
