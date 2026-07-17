@@ -324,6 +324,27 @@ class SearchConfig(BaseModel):
         return self
 
 
+class OrbitConfig(BaseModel):
+    """GitLab Orbit knowledge graph integration."""
+
+    enabled: bool = False
+    mode: str = "local"  # local | remote
+    command: str = "orbit"
+    database_path: str | None = None
+    required: bool = False
+    refresh_before_run: bool = False
+    index_command: str | None = None
+    remote_group: str | None = None
+
+    @model_validator(mode="after")
+    def _normalize_mode(self) -> "OrbitConfig":
+        mode = (self.mode or "local").lower()
+        if mode not in {"local", "remote"}:
+            raise ValueError("orbit.mode must be local or remote")
+        self.mode = mode
+        return self
+
+
 class CoordinatorConfig(ProxyModel):
     """Runtime configuration for the Coordinator.
 
@@ -391,6 +412,7 @@ class CoordinatorConfig(ProxyModel):
 
     # ── Search / related-work annotation ─────────────────────────────
     search: SearchConfig = PydField(default_factory=SearchConfig)
+    orbit: OrbitConfig = PydField(default_factory=OrbitConfig)
 
     # ── Convergence detection ────────────────────────────────────────
     convergence: ConvergenceConfig = PydField(default_factory=ConvergenceConfig)
@@ -425,6 +447,8 @@ class CoordinatorConfig(ProxyModel):
             out["budget_policy"] = BudgetPolicy.from_dict(out["budget_policy"])
         if isinstance(out.get("search"), dict):
             out["search"] = SearchConfig(**out["search"])
+        if isinstance(out.get("orbit"), dict):
+            out["orbit"] = OrbitConfig(**out["orbit"])
         if isinstance(out.get("convergence"), dict):
             out["convergence"] = ConvergenceConfig.from_dict(out["convergence"])
         return out

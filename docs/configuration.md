@@ -46,6 +46,7 @@ Settings fall into four tiers, from "almost everyone touches this" to "advanced"
 | **Optional** | `interaction_mode` | How much you steer the run (auto vs. approve ideas) | You want a human in the loop. See [Interaction Modes](interaction-modes.md). |
 | **Optional** | `webui_port` / `--no-webui` | The read-only browser monitor | Watch progress live, or turn it off. |
 | **Advanced** | `plugin`, `plugin_profile` | Retarget DevPilot to a domain (eval rules, protected files, budget bundle) | You run the same kind of benchmark often. See [Plugins](plugins.md). |
+| **Advanced** | `orbit.enabled` | Use GitLab Orbit as a knowledge-graph discovery step | You have indexed the repo/group with Orbit. See [GitLab Orbit](orbit.md). |
 | **Advanced** | skills | Sharpen *how* the agent reasons at a step | You want better ideation/analysis. See [Skills](skills.md). |
 
 ### The settings that matter most

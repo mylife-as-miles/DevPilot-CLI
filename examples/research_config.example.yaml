@@ -42,6 +42,17 @@ ui:
   interaction_mode: auto  # auto | direction | review | collaborative
   # webui_port: 8765       # set to expose the read-only WebUI
 
+# GitLab Orbit knowledge graph (optional).
+orbit:
+  enabled: false
+  mode: local              # local | remote
+  command: orbit
+  # database_path: ~/.orbit/graph.duckdb
+  # required: true          # fail preflight if Orbit is unavailable/unindexed
+  # refresh_before_run: true
+  # index_command: orbit index .
+  # remote_group: my-group  # for mode: remote
+
 # ─────────────────────────────────────────────────────────────────────────────
 # More LLM examples — copy the one you need into `llm:` above.
 # ─────────────────────────────────────────────────────────────────────────────

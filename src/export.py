@@ -330,7 +330,7 @@ def _read_text(path: Path, max_bytes: int = _MAX_ARTIFACT_BYTES) -> str:
 
 def _relative_to(path: Path, root: Path) -> str:
     try:
-        return str(path.relative_to(root))
+        return path.relative_to(root).as_posix()
     except ValueError:
         return str(path)
 

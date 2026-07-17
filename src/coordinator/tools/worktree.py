@@ -11,9 +11,9 @@ run loop and tool surface.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
-import shlex
 import shutil
 import tempfile
 from datetime import datetime, timezone
@@ -21,12 +21,29 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ...core.git_artifacts import filter_commit_paths
-from .git_ops import _run_git, _user_token
+from .git_ops import _user_token
 
 if TYPE_CHECKING:
     from ..config import CoordinatorConfig
 
 log = logging.getLogger(__name__)
+
+
+async def _run_git_args(args: list[str], cwd: str, timeout: int = 60) -> tuple[str, int]:
+    """Run git with argv semantics so paths are portable across shells."""
+    proc = await asyncio.create_subprocess_exec(
+        "git",
+        *args,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+        cwd=cwd,
+    )
+    try:
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        return stdout.decode("utf-8", errors="replace").strip(), proc.returncode or 0
+    except asyncio.TimeoutError:
+        proc.kill()
+        return f"[timed out after {timeout}s]", -1
 
 
 # ── Naming ───────────────────────────────────────────────────────────
@@ -72,18 +89,15 @@ async def _create_worktree(cwd: str, branch_name: str, start_point: str | None =
 
     # Clean up if exists from a previous failed run
     if worktree_path.exists():
-        await _run_git(
-            f"git worktree remove --force {shlex.quote(str(worktree_path))}", cwd
-        )
+        await _run_git_args(["worktree", "remove", "--force", str(worktree_path)], cwd)
         if worktree_path.exists():
             shutil.rmtree(worktree_path, ignore_errors=True)
 
     # Create worktree with new branch from start_point (or HEAD if not specified)
-    start_ref = shlex.quote(start_point) if start_point else ""
-    out, rc = await _run_git(
-        f"git worktree add -b {shlex.quote(branch_name)} {shlex.quote(str(worktree_path))} {start_ref}".strip(),
-        cwd,
-    )
+    args = ["worktree", "add", "-b", branch_name, str(worktree_path)]
+    if start_point:
+        args.append(start_point)
+    out, rc = await _run_git_args(args, cwd)
     if rc != 0:
         # Branch might already exist from a previous run — add timestamp suffix
         ts = datetime.now(timezone.utc).strftime("%m%d-%H%M%S")
@@ -91,10 +105,10 @@ async def _create_worktree(cwd: str, branch_name: str, start_point: str | None =
         dir_name = _worktree_dir_name(branch_name)
         worktree_path = worktree_base / dir_name
 
-        out, rc = await _run_git(
-            f"git worktree add -b {shlex.quote(branch_name)} {shlex.quote(str(worktree_path))} {start_ref}".strip(),
-            cwd,
-        )
+        args = ["worktree", "add", "-b", branch_name, str(worktree_path)]
+        if start_point:
+            args.append(start_point)
+        out, rc = await _run_git_args(args, cwd)
         if rc != 0:
             if worktree_path.exists():
                 shutil.rmtree(worktree_path, ignore_errors=True)
@@ -106,9 +120,9 @@ async def _create_worktree(cwd: str, branch_name: str, start_point: str | None =
 async def _finalize_worktree(worktree_path: Path, node_id: str) -> None:
     """Commit useful code changes in the worktree before removal."""
     wt = str(worktree_path)
-    await _run_git("git reset --", wt)
-    diff, _ = await _run_git("git diff --name-only", wt)
-    untracked, _ = await _run_git("git ls-files --others --exclude-standard", wt)
+    await _run_git_args(["reset", "--"], wt)
+    diff, _ = await _run_git_args(["diff", "--name-only"], wt)
+    untracked, _ = await _run_git_args(["ls-files", "--others", "--exclude-standard"], wt)
     changed_paths = [line.strip() for line in (diff + "\n" + untracked).splitlines() if line.strip()]
     commit_paths, artifact_paths = filter_commit_paths(changed_paths)
 
@@ -118,20 +132,14 @@ async def _finalize_worktree(worktree_path: Path, node_id: str) -> None:
     if not commit_paths:
         return
 
-    quoted_paths = " ".join(shlex.quote(path) for path in commit_paths)
-    await _run_git(f"git add -- {quoted_paths}", wt)
-    await _run_git(
-        f"git commit -m {shlex.quote(f'coordinator: finalize {node_id}')}",
-        wt,
-    )
+    await _run_git_args(["add", "--", *commit_paths], wt)
+    await _run_git_args(["commit", "-m", f"coordinator: finalize {node_id}"], wt)
 
 
 async def _remove_worktree(cwd: str, worktree_path: Path) -> None:
     """Remove a git worktree (the branch is preserved for later merging)."""
     try:
-        await _run_git(
-            f"git worktree remove --force {shlex.quote(str(worktree_path))}", cwd
-        )
+        await _run_git_args(["worktree", "remove", "--force", str(worktree_path)], cwd)
     except Exception as e:
         log.warning("Failed to remove worktree %s: %s", worktree_path, e)
     if worktree_path.exists():

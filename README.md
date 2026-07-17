@@ -39,6 +39,7 @@ This repository is a maintained CLI distribution of [DevPilot](https://github.co
 - **Interactive intake** — A conversational setup phase turns your goal, metric, baseline, and constraints into a one-screen Research Contract before the run starts.
 - **Live observability** — Terminal dashboard, optional read-only WebUI, slash commands, and checkpoint/resume for long runs.
 - **Flexible LLM backends** — Anthropic Claude, OpenAI Responses API, Gemini (Interactions API), OpenAI-compatible gateways (DeepSeek, Qwen, vLLM, Ollama), and LiteLLM.
+- **GitLab Orbit context** — Optional Orbit Local/Remote knowledge-graph discovery before experiments run.
 - **Domain plugins** — Retarget evaluation rules, protected paths, and budgets with a single YAML plugin line.
 - **Agent Skill Suite** — Optional Codex / Claude Code skills for DevPilot-style workflows outside the native runtime.
 

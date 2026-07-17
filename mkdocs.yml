@@ -51,6 +51,7 @@ nav:
       - Configuration: configuration.md
       - Interaction Modes: interaction-modes.md
       - Web UI & Monitoring: web-ui.md
+      - GitLab Orbit: orbit.md
       - Plugins: plugins.md
       - Skills: skills.md
       - Outputs & Resume: outputs-and-resume.md
