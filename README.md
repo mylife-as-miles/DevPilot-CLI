@@ -245,7 +245,7 @@ devpilot --resume --run-name <run_name>
 | | Native CLI | Agent Skill Suite |
 | --- | --- | --- |
 | **Location** | `devpilot` command | [`skills/`](skills/README.md) |
-| **Best for** | Full research runs, dashboard, checkpoints, merge discipline | Codex / Claude Code environments |
+| **Best for** | Full research runs, dashboard, checkpoints, merge discipline | Gitlab Duo Agent / Codex / Claude Code environments |
 | **Recommendation** | Preferred for complete DevPilot behavior | Useful integration layer |
 
 ## Project structure
@@ -284,9 +284,3 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup inst
 ## License
 
 Released under the [Apache License 2.0](LICENSE).
-
-## Acknowledgments
-
-DevPilot is based on research from Renmin University of China ([paper](https://arxiv.org/pdf/2606.11926), [upstream repository](https://github.com/RUC-NLPIR/DevPilot)).
-
-Maintained by [Osita Miles](https://github.com/mylife-as-miles).
