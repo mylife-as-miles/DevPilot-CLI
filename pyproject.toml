@@ -66,6 +66,7 @@ packages = [
     "devpilot.coordinator",
     "devpilot.coordinator.tools",
     "devpilot.core",
+    "devpilot.core.learning",
     "devpilot.core.llm",
     "devpilot.core.oauth",
     "devpilot.core.tools",

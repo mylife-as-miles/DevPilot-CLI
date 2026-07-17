@@ -40,6 +40,7 @@ This repository is a maintained CLI distribution of [DevPilot](https://github.co
 - **Live observability** — Terminal dashboard, optional read-only WebUI, slash commands, and checkpoint/resume for long runs.
 - **Flexible LLM backends** — Anthropic Claude, OpenAI Responses API, Gemini (Interactions API), OpenAI-compatible gateways (DeepSeek, Qwen, vLLM, Ollama), and LiteLLM.
 - **GitLab Orbit context** — Optional Orbit Local/Remote knowledge-graph discovery before experiments run.
+- **DevPilot Learning Layer** — Project-local memories, trajectory compression, and reusable skill mining from past runs.
 - **Domain plugins** — Retarget evaluation rules, protected paths, and budgets with a single YAML plugin line.
 - **Agent Skill Suite** — Optional Codex / Claude Code skills for DevPilot-style workflows outside the native runtime.
 
@@ -245,6 +246,7 @@ See [GitLab Orbit](docs/orbit.md) for Local and Remote setup.
 | `devpilot doctor` | Diagnose install, PATH, git, and API connectivity. |
 | `devpilot config` | View or edit global configuration. |
 | `devpilot report <session>` | Re-render `REPORT.md` for a past session. |
+| `devpilot learn` | Inspect local run memories, mined skills, and compressed trajectories. |
 | `devpilot export <session>` | Export a session to HTML or JSONL. |
 | `devpilot version` | Print the installed version. |
 
@@ -301,6 +303,22 @@ devpilot reach agent-reach update-help
 
 This evidence store serves as a structured, read-only reference of all internet research performed during the lifetime of a research run. If run outside of a session context (e.g. via direct CLI commands), the tools bypass evidence persistence.
 
+## DevPilot Learning Layer
+
+DevPilot can now learn from previous runs by extracting local memories, compressing trajectories, and mining reusable skills.
+
+Learning data is stored under the active project in `.devpilot/memory/` as append-only JSONL. Phase 1 is local and deterministic: no network calls, no background jobs, no messaging gateways, and no global learning store.
+
+```bash
+devpilot learn doctor
+devpilot learn summarize
+devpilot learn memory search "query"
+devpilot learn skills mine
+devpilot learn trajectory compress
+```
+
+The learning layer is inspired by self-improving agent systems like [Hermes Agent](https://github.com/NousResearch/hermes-agent), but it is implemented natively for DevPilot. Coordinator and Executor prompts receive only a small learned-memory section: at most five relevant memories and three reusable skills.
+
 ## CLI vs. Agent Skills
 
 | | Native CLI | Agent Skill Suite |
@@ -314,6 +332,7 @@ This evidence store serves as a structured, read-only reference of all internet 
 ```
 src/                    # imported as the `devpilot` package
 ├── core/               # ReAct loop, LLM providers, tools, context management
+│   └── learning/       # Local memory, skill mining, and trajectory compression
 ├── coordinator/        # Idea Tree, orchestrator, coordinator tools
 ├── executor/           # Executor agent and CLI
 ├── cli/                # Interactive CLI, intake, setup, dashboard

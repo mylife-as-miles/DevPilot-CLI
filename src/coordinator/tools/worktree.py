@@ -81,7 +81,8 @@ async def _create_worktree(cwd: str, branch_name: str, start_point: str | None =
     If start_point is provided, the worktree branches from that ref
     (e.g. a working trunk branch) instead of HEAD.
     """
-    worktree_base = Path(tempfile.gettempdir()) / f"coordinator-worktrees-{_user_token()}"
+    repo_token = hashlib.sha1(str(Path(cwd).resolve()).encode("utf-8", errors="replace")).hexdigest()[:10]
+    worktree_base = Path(tempfile.gettempdir()) / f"coordinator-worktrees-{_user_token()}" / repo_token
     worktree_base.mkdir(parents=True, exist_ok=True)
 
     dir_name = _worktree_dir_name(branch_name)
@@ -100,7 +101,7 @@ async def _create_worktree(cwd: str, branch_name: str, start_point: str | None =
     out, rc = await _run_git_args(args, cwd)
     if rc != 0:
         # Branch might already exist from a previous run — add timestamp suffix
-        ts = datetime.now(timezone.utc).strftime("%m%d-%H%M%S")
+        ts = datetime.now(timezone.utc).strftime("%m%d-%H%M%S-%f")
         branch_name = f"{branch_name}-{ts}"
         dir_name = _worktree_dir_name(branch_name)
         worktree_path = worktree_base / dir_name

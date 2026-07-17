@@ -24,7 +24,7 @@ def report_command(
         typer.secho(f"error: session not found: {session}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=2)
 
-    path = generate_report(session_dir)
+    path = generate_report(session_dir, project_root=cwd.resolve())
     typer.secho(f"Wrote {path}", fg=typer.colors.GREEN)
 
 

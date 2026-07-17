@@ -28,6 +28,7 @@ def build_coordinator_system_prompt(config: CoordinatorConfig) -> str:
         _environment_section(config),
         _related_work_annotation_section(config),
         _ask_user_section(config),
+        _learned_memory_section(config),
         _reach_evidence_section(config),
     ]
     return "\n\n".join(s for s in sections if s)
@@ -860,3 +861,20 @@ def _reach_evidence_section(config: CoordinatorConfig) -> str:
         lines.append(f"  > {excerpt}")
 
     return "\n".join(lines)
+
+
+def _learned_memory_section(config: CoordinatorConfig) -> str:
+    try:
+        from ..core.learning.search import build_learned_memory_section
+        from ..core.learning.store import resolve_learning_project_root
+
+        project_root = resolve_learning_project_root(config.cwd, config.workspace_dir)
+        query = " ".join(part for part in (config.task, config.cwd) if part)
+        return build_learned_memory_section(
+            project_root,
+            query=query,
+            max_memories=5,
+            max_skills=3,
+        )
+    except Exception:
+        return ""

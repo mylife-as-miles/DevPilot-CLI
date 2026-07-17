@@ -558,6 +558,7 @@ def run_command(
             instruction=refined_instruction,
             event_stats=stats.stats,
             exit_reason=exit_reason,
+            project_root=plan_cwd,
         )
         render_status(f"report written: {report_path}", style="green", glyph="✓")
     except Exception as exc:

@@ -29,10 +29,12 @@ def generate_report(
     instruction: str | None = None,
     event_stats: EventStats | None = None,
     exit_reason: str = "ok",
+    project_root: Path | None = None,
 ) -> Path:
     """Write REPORT.md and return its path. Never raises on missing data."""
     session_dir = Path(session_dir).resolve()
     session_dir.mkdir(parents=True, exist_ok=True)
+    learning_project_root = Path(project_root).resolve() if project_root else _infer_learning_project_root(session_dir)
 
     run_stats = _load_json(session_dir / "run_stats.json")
     tree = _load_json(session_dir / ".coordinator" / "idea_tree.json")
@@ -45,6 +47,7 @@ def generate_report(
     parts.append(_render_results(tree))
     parts.append(_render_idea_tree(tree))
     parts.append(_render_reach_evidence(session_dir))
+    parts.append(_render_learned_memory(session_dir, learning_project_root))
     parts.append(_render_artifacts(session_dir))
 
     body = "\n\n".join(p for p in parts if p)
@@ -300,4 +303,63 @@ def _render_reach_evidence(session_dir: Path) -> str:
             lines.append("")
 
     return "\n".join(lines).strip()
+
+
+def _render_learned_memory(session_dir: Path, project_root: Path) -> str:
+    try:
+        from ..core.learning.memory import extract_memories_from_session
+        from ..core.learning.skill_miner import mine_skills_from_memories
+        from ..core.learning.store import LearningStore
+
+        store = LearningStore(project_root)
+        memories = extract_memories_from_session(session_dir, project_root)
+        existing_skills = store.list_skills()
+
+        stored_memories = 0
+        created_skills = 0
+        if memories:
+            store.ensure()
+            stored_memories = store.append_memories(memories, dedupe=True)
+            created_skills = store.append_skills(
+                mine_skills_from_memories(memories),
+                dedupe=True,
+            )
+
+        lessons = [
+            str(m.get("content") or m.get("title") or "").strip()
+            for m in memories
+            if m.get("kind") in {"lesson", "strategy", "decision"}
+        ]
+        if not lessons:
+            lessons = [
+                str(m.get("content") or m.get("title") or "").strip()
+                for m in store.list_memories(limit=5)
+                if m.get("kind") in {"lesson", "strategy", "decision"}
+            ]
+
+        skills_count = created_skills or min(len(existing_skills), 3)
+        if not memories and not lessons and not skills_count:
+            return ""
+
+        lines = ["## Learned Memory", ""]
+        lines.append(f"- Memories extracted: {len(memories)}")
+        lines.append(f"- Skills used or created: {skills_count}")
+        if stored_memories:
+            lines.append(f"- New memories stored: {stored_memories}")
+        if lessons:
+            lines.append("- Key reusable lessons:")
+            for lesson in lessons[:5]:
+                excerpt = lesson[:180].replace("\n", " ").strip()
+                if len(lesson) > 180:
+                    excerpt += "..."
+                lines.append(f"  - {excerpt}")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def _infer_learning_project_root(session_dir: Path) -> Path:
+    from ..core.learning.store import infer_project_root_from_session
+
+    return infer_project_root_from_session(session_dir)
 
