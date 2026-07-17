@@ -1,0 +1,13 @@
+[submodule "vendor/iFixAi"]
+	path = vendor/iFixAi
+	url = https://github.com/ifixai-ai/iFixAi.git
+[submodule "vendor/mempalace"]
+	path = vendor/mempalace
+	url = https://github.com/MemPalace/mempalace.git
+	branch = develop
+[submodule "vendor/hermes-agent"]
+	path = vendor/hermes-agent
+	url = https://github.com/NousResearch/hermes-agent.git
+[submodule "vendor/headroom"]
+	path = vendor/headroom
+	url = https://github.com/headroomlabs-ai/headroom.git
