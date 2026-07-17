@@ -44,6 +44,7 @@ def generate_report(
     parts.append(_render_run_stats(run_stats))
     parts.append(_render_results(tree))
     parts.append(_render_idea_tree(tree))
+    parts.append(_render_reach_evidence(session_dir))
     parts.append(_render_artifacts(session_dir))
 
     body = "\n\n".join(p for p in parts if p)
@@ -248,3 +249,55 @@ def _fmt_duration(seconds: float) -> str:
     if m:
         return f"{m}m {s}s"
     return f"{s}s"
+
+
+def _render_reach_evidence(session_dir: Path) -> str:
+    from ..core.tools.reach.evidence import list_reach_evidence
+
+    records = list_reach_evidence(str(session_dir))
+    if not records:
+        return ""
+
+    lines = ["## Reach Evidence", ""]
+    lines.append(f"_{len(records)} evidence record(s) collected during the session._")
+    lines.append("")
+
+    # Group records by hypothesis_id (default to 'General' if None)
+    grouped: dict[str, list[dict]] = {}
+    for r in records:
+        hypo = r.get("hypothesis_id") or "General"
+        grouped.setdefault(hypo, []).append(r)
+
+    # Sort groups so 'General' is last, others sorted alphabetically
+    group_keys = sorted([k for k in grouped if k != "General"])
+    if "General" in grouped:
+        group_keys.append("General")
+
+    for key in group_keys:
+        lines.append(f"### Hypothesis: {key}")
+        lines.append("")
+        for r in grouped[key]:
+            timestamp = r.get("timestamp", "")
+            if timestamp and "T" in timestamp:
+                time_part = timestamp.split("T")[1].rstrip("Z")[:8]
+                ts_label = f"[{time_part}]"
+            else:
+                ts_label = ""
+
+            tool = r.get("tool", "")
+            source = r.get("source", "")
+            title = r.get("title")
+            title_part = f" - **{title}**" if title else ""
+            
+            lines.append(f"- {ts_label} `{tool}`: [{source}]({source}){title_part}")
+            
+            content = r.get("content", "").strip()
+            if content:
+                excerpt = content[:200].replace("\n", " ").strip()
+                if len(content) > 200:
+                    excerpt += "..."
+                lines.append(f"  > {excerpt}")
+            lines.append("")
+
+    return "\n".join(lines).strip()
+

@@ -70,6 +70,8 @@ packages = [
     "devpilot.core.oauth",
     "devpilot.core.tools",
     "devpilot.core.tools.web",
+    "devpilot.core.tools.reach",
+    "devpilot.core.tools.reach.channels",
     "devpilot.events",
     "devpilot.events.subscribers",
     "devpilot.executor",

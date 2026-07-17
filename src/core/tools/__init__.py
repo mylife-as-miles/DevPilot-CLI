@@ -11,6 +11,7 @@ from .grep import GrepTool
 from .glob_tool import GlobTool
 from .run_training import RunTrainingTool
 from .executor_tool import ExecutorTool
+from .reach.runtime_tools import get_reach_tools
 
 if TYPE_CHECKING:
     from ..config import AgentConfig
@@ -57,6 +58,7 @@ def get_all_tools(
     ]
     if agent is not None:
         tools.append(ExecutorTool(cwd=cwd, parent_agent=agent, workspace_dir=workspace_dir))  # type: ignore[arg-type]
+    tools.extend(get_reach_tools(cwd=cwd, workspace_dir=workspace_dir, config=config))
     return tools
 
 
@@ -71,4 +73,5 @@ __all__ = [
     "GlobTool",
     "ExecutorTool",
     "get_all_tools",
+    "get_reach_tools",
 ]

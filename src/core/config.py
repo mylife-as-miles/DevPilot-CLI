@@ -60,6 +60,7 @@ class AgentConfig(ProxyModel):
     # ── Runtime-only handles (never serialized) ──────────────────────
     # Event attribution: which tree node / agent these emissions belong to.
     node_id: str = Field(default="", exclude=True, repr=False)
+    cycle_id: str | None = Field(default=None, exclude=True, repr=False)
     agent_label: str = Field(default="agent", exclude=True, repr=False)
     # Callback drained between turns; returns fresh user messages to inject
     # (used by the live dashboard to forward typed-in questions).
