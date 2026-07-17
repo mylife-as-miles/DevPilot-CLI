@@ -1,0 +1,1 @@
+"""Bundled DevPilot prompt skills."""

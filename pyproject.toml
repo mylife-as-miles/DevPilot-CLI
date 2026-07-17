@@ -1,5 +1,5 @@
 [project]
-name = "devpilot-agent"
+name = "miles-devpilot-cli"
 dynamic = ["version"]
 description = "DevPilot — an autonomous research agent that proposes ideas, edits code, runs experiments, and iterates on a hypothesis tree."
 readme = "README.md"
@@ -24,9 +24,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/RUC-NLPIR/DevPilot"
-Repository = "https://github.com/RUC-NLPIR/DevPilot"
-Issues = "https://github.com/RUC-NLPIR/DevPilot/issues"
+Homepage = "https://github.com/mylife-as-miles/DevPilot-CLI"
+Repository = "https://github.com/mylife-as-miles/DevPilot-CLI"
+Issues = "https://github.com/mylife-as-miles/DevPilot-CLI/issues"
 
 [project.optional-dependencies]
 docs = [
@@ -67,6 +67,7 @@ packages = [
     "devpilot.coordinator.tools",
     "devpilot.core",
     "devpilot.core.llm",
+    "devpilot.core.oauth",
     "devpilot.core.tools",
     "devpilot.core.tools.web",
     "devpilot.events",
@@ -75,11 +76,13 @@ packages = [
     "devpilot.plugins",
     "devpilot.report",
     "devpilot.search_agent",
+    "devpilot.skills",
     "devpilot.webui",
 ]
 
 [tool.setuptools.package-data]
 "devpilot" = ["skills/*.md", "py.typed"]
+"devpilot.skills" = ["*.md"]
 "devpilot.webui" = ["index.html"]
 "devpilot.plugins" = ["*.yaml", "*.yml"]
 
