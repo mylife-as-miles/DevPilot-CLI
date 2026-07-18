@@ -21,6 +21,7 @@ from .commands.audit_cmd import audit_app
 from .commands.skills_cmd import skills_app
 from .commands.memory_cmd import memory_app
 from .commands.compress_cmd import compress_app
+from .commands.acp_cmd import acp_command
 
 
 # We don't use a Typer.callback() default because that would shadow flag
@@ -52,20 +53,25 @@ app.add_typer(audit_app, name="audit")
 app.add_typer(skills_app, name="skills")
 app.add_typer(memory_app, name="memory")
 app.add_typer(compress_app, name="compress")
+app.command("acp")(acp_command)
 
 
 @app.command("version")
 def version_command() -> None:
     """Print the installed version."""
-    try:
-        from importlib.metadata import version as _v
-        ver = _v(APP_NAME)
-    except Exception:
-        ver = "unknown"
+    from importlib.metadata import PackageNotFoundError, version as _v
+
+    ver = "unknown"
+    for distribution in ("miles-devpilot-cli", "devpilot-agent"):
+        try:
+            ver = _v(distribution)
+            break
+        except PackageNotFoundError:
+            continue
     typer.echo(f"{APP_NAME} {ver}")
 
 
-_KNOWN_COMMANDS = {"run", "report", "export", "config", "version", "doctor", "setup", "login", "reach", "learn", "audit", "skills", "memory", "compress"}
+_KNOWN_COMMANDS = {"run", "report", "export", "config", "version", "doctor", "setup", "login", "reach", "learn", "audit", "skills", "memory", "compress", "acp"}
 _ROOT_FLAGS = {"--help", "-h"}
 _VERSION_FLAGS = {"--version", "-V"}
 

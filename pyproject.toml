@@ -21,6 +21,7 @@ dependencies = [
     "prompt-toolkit>=3.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
+    "agent-client-protocol>=0.11,<0.12",
 ]
 
 [project.urls]
@@ -63,6 +64,7 @@ packages = [
     "devpilot.cli",
     "devpilot.cli.commands",
     "devpilot.cli.intake",
+    "devpilot.acp",
     "devpilot.coordinator",
     "devpilot.coordinator.tools",
     "devpilot.core",
