@@ -233,6 +233,46 @@ class ContextConfig(BaseModel):
     compact_keep_recent: int = 20
 
 
+class MemoryConfig(BaseModel):
+    """Optional long-term memory recall configuration."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    provider: str = "mempalace"
+    enabled: bool = False
+    auto_wake_up: bool = False
+    max_context_chars: int = 4000
+
+    @field_validator("provider", mode="before")
+    @classmethod
+    def _normalize_provider(cls, value: Any) -> str:
+        provider = str(value or "mempalace").lower()
+        if provider not in {"mempalace"}:
+            raise ValueError("memory.provider must be mempalace")
+        return provider
+
+
+class CompressionConfig(BaseModel):
+    """Optional context-compression configuration."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    provider: str = "headroom"
+    enabled: bool = False
+    compress_reach_evidence: bool = True
+    compress_memory_context: bool = True
+    compress_test_logs: bool = True
+    max_context_chars: int = 6000
+
+    @field_validator("provider", mode="before")
+    @classmethod
+    def _normalize_provider(cls, value: Any) -> str:
+        provider = str(value or "headroom").lower()
+        if provider not in {"headroom"}:
+            raise ValueError("compression.provider must be headroom")
+        return provider
+
+
 class UIConfig(BaseModel):
     """Interaction / observability switches (contract C6).
 

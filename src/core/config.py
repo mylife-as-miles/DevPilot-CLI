@@ -16,8 +16,10 @@ from pydantic import Field
 
 from .config_schema import (
     SHARED_FLAT,
+    CompressionConfig,
     ContextConfig,
     LLMConfig,
+    MemoryConfig,
     ProxyModel,
     TimeoutConfig,
 )
@@ -34,6 +36,8 @@ class AgentConfig(ProxyModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     timeout: TimeoutConfig = Field(default_factory=TimeoutConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
+    memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    compression: CompressionConfig = Field(default_factory=CompressionConfig)
 
     # ── Target codebase ──────────────────────────────────────────────
     cwd: str = "."

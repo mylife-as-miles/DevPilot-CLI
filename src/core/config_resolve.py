@@ -95,13 +95,15 @@ def _warn_unknown_mapping_keys(
 def _warn_unknown_nested_blocks(mapping: dict[str, Any], *, location: str) -> None:
     from ..coordinator.config import BudgetPolicy, OrbitConfig, SearchConfig
     from ..coordinator.convergence import ConvergenceConfig
-    from .config_schema import ContextConfig, LLMConfig, TimeoutConfig, UIConfig
+    from .config_schema import CompressionConfig, ContextConfig, LLMConfig, MemoryConfig, TimeoutConfig, UIConfig
 
     block_fields: dict[str, set[str]] = {
         "llm": set(LLMConfig.model_fields) | set(LLMConfig.FIELD_ALIASES),
         "timeout": set(TimeoutConfig.model_fields),
         "context": set(ContextConfig.model_fields),
         "ui": set(UIConfig.model_fields),
+        "memory": set(MemoryConfig.model_fields),
+        "compression": set(CompressionConfig.model_fields),
         "budget_policy": set(BudgetPolicy.model_fields) | {
             "total_time_budget", "time_budget", "run_training_default", "run_training_max",
         },

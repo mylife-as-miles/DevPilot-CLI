@@ -17,6 +17,10 @@ from .commands.doctor_cmd import doctor_command
 from .commands.setup_cmd import setup_command
 from .commands.reach_cmd import reach_app
 from .commands.learn_cmd import learn_app
+from .commands.audit_cmd import audit_app
+from .commands.skills_cmd import skills_app
+from .commands.memory_cmd import memory_app
+from .commands.compress_cmd import compress_app
 
 
 # We don't use a Typer.callback() default because that would shadow flag
@@ -44,6 +48,10 @@ app.add_typer(config_app, name="config")
 app.add_typer(login_app, name="login")
 app.add_typer(reach_app, name="reach")
 app.add_typer(learn_app, name="learn")
+app.add_typer(audit_app, name="audit")
+app.add_typer(skills_app, name="skills")
+app.add_typer(memory_app, name="memory")
+app.add_typer(compress_app, name="compress")
 
 
 @app.command("version")
@@ -57,7 +65,7 @@ def version_command() -> None:
     typer.echo(f"{APP_NAME} {ver}")
 
 
-_KNOWN_COMMANDS = {"run", "report", "export", "config", "version", "doctor", "setup", "login", "reach", "learn"}
+_KNOWN_COMMANDS = {"run", "report", "export", "config", "version", "doctor", "setup", "login", "reach", "learn", "audit", "skills", "memory", "compress"}
 _ROOT_FLAGS = {"--help", "-h"}
 _VERSION_FLAGS = {"--version", "-V"}
 

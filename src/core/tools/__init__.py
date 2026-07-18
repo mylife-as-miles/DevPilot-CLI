@@ -11,7 +11,9 @@ from .grep import GrepTool
 from .glob_tool import GlobTool
 from .run_training import RunTrainingTool
 from .executor_tool import ExecutorTool
+from .skill import LoadSkillTool
 from .reach.runtime_tools import get_reach_tools
+from ..skill_registry import build_default_registry
 
 if TYPE_CHECKING:
     from ..config import AgentConfig
@@ -56,6 +58,9 @@ def get_all_tools(
         GrepTool(cwd=cwd, workspace_dir=workspace_dir),
         GlobTool(cwd=cwd, workspace_dir=workspace_dir),
     ]
+    skill_registry = build_default_registry(cwd)
+    if len(skill_registry):
+        tools.append(LoadSkillTool(cwd=cwd, registry=skill_registry))
     if agent is not None:
         tools.append(ExecutorTool(cwd=cwd, parent_agent=agent, workspace_dir=workspace_dir))  # type: ignore[arg-type]
     tools.extend(get_reach_tools(cwd=cwd, workspace_dir=workspace_dir, config=config))
@@ -72,6 +77,7 @@ __all__ = [
     "GrepTool",
     "GlobTool",
     "ExecutorTool",
+    "LoadSkillTool",
     "get_all_tools",
     "get_reach_tools",
 ]

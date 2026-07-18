@@ -36,6 +36,7 @@ def build_system_prompt(config: AgentConfig, plugin: "Plugin | None" = None) -> 
         _plugin_preamble_inject(plugin),
         _system_section(),
         _doing_tasks_section(),
+        _coding_discipline_skill_section(),
         _actions_section(),
         _using_tools_section(),
         _tone_and_style_section(),
@@ -43,6 +44,7 @@ def build_system_prompt(config: AgentConfig, plugin: "Plugin | None" = None) -> 
         _budget_policy_section(config),
         _experiment_workflow_section(config, plugin),
         _environment_section(config),
+        _long_term_memory_section(config),
         _learned_memory_section(config),
         _reach_evidence_section(config),
     ]
@@ -135,6 +137,16 @@ but no half-finished implementations either. Three similar lines of code is \
 better than a premature abstraction.
  - Before reporting a task as complete, verify it actually works: run the \
 test, execute the script, check the output. Do not assume success."""
+
+
+def _coding_discipline_skill_section() -> str:
+    return """\
+# Built-in coding discipline skill
+
+For non-trivial source edits, bug fixes, refactors, tests, or minimal patches, \
+use `LoadSkill(skill_name="karpathy-coding")` when the tool is available. Keep \
+the prompt impact compact: load the full skill only when it is relevant, and \
+let project-specific instructions override the generic guidance."""
 
 
 # ---------------------------------------------------------------------------
@@ -484,7 +496,7 @@ def _reach_evidence_section(config: AgentConfig) -> str:
         lines.append(f"- `{tool}` on {source}{title_s}{node_s}:")
         lines.append(f"  > {excerpt}")
 
-    return "\n".join(lines)
+    return _maybe_compress_section(config, "\n".join(lines), kind="reach")
 
 
 def _learned_memory_section(config: AgentConfig) -> str:
@@ -494,12 +506,50 @@ def _learned_memory_section(config: AgentConfig) -> str:
 
         project_root = resolve_learning_project_root(config.cwd, config.workspace_dir)
         query = " ".join(part for part in (config.idea, config.node_id, config.cwd) if part)
-        return build_learned_memory_section(
+        section = build_learned_memory_section(
             project_root,
             query=query,
             hypothesis_id=config.node_id or None,
             max_memories=5,
             max_skills=3,
         )
+        return _maybe_compress_section(config, section, kind="learned_memory")
     except Exception:
         return ""
+
+
+def _long_term_memory_section(config: AgentConfig) -> str:
+    try:
+        memory = getattr(config, "memory", None)
+        if memory is None or not memory.enabled or not memory.auto_wake_up:
+            return ""
+        from ..core.learning.store import resolve_learning_project_root
+        from ..core.memory_palace.context import build_long_term_memory_section
+
+        project_root = resolve_learning_project_root(config.cwd, config.workspace_dir)
+        query = " ".join(part for part in (config.idea, config.node_id, config.cwd) if part)
+        section = build_long_term_memory_section(
+            project_root,
+            query=query,
+            max_chars=memory.max_context_chars,
+            max_snippets=5,
+        )
+        return _maybe_compress_section(config, section, kind="memory")
+    except Exception:
+        return ""
+
+
+def _maybe_compress_section(config: AgentConfig, section: str, *, kind: str) -> str:
+    try:
+        from ..core.learning.store import resolve_learning_project_root
+        from ..core.compression.prompt_context import maybe_compress_prompt_context
+
+        project_root = resolve_learning_project_root(config.cwd, config.workspace_dir)
+        return maybe_compress_prompt_context(
+            section,
+            project_root=project_root,
+            compression_config=getattr(config, "compression", None),
+            kind=kind,
+        )
+    except Exception:
+        return section

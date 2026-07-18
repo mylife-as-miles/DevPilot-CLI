@@ -5,7 +5,7 @@ description = "DevPilot — an autonomous research agent that proposes ideas, ed
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 keywords = ["ai", "agent", "autonomous-research", "llm", "experimentation"]
 authors = [{ name = "Jiajie Jin", email = "jinjiajie@ruc.edu.cn" }]
 dependencies = [
@@ -66,7 +66,10 @@ packages = [
     "devpilot.coordinator",
     "devpilot.coordinator.tools",
     "devpilot.core",
+    "devpilot.core.audit",
+    "devpilot.core.compression",
     "devpilot.core.learning",
+    "devpilot.core.memory_palace",
     "devpilot.core.llm",
     "devpilot.core.oauth",
     "devpilot.core.tools",

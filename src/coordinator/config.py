@@ -12,8 +12,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..core.config_schema import (
     SHARED_FLAT,
+    CompressionConfig,
     ContextConfig,
     LLMConfig,
+    MemoryConfig,
     ProxyModel,
     TimeoutConfig,
     UIConfig,
@@ -363,6 +365,8 @@ class CoordinatorConfig(ProxyModel):
     timeout: TimeoutConfig = PydField(default_factory=TimeoutConfig)
     context: ContextConfig = PydField(default_factory=ContextConfig)
     ui: UIConfig = PydField(default_factory=UIConfig)
+    memory: MemoryConfig = PydField(default_factory=MemoryConfig)
+    compression: CompressionConfig = PydField(default_factory=CompressionConfig)
 
     # ── Target codebase ──────────────────────────────────────────────
     cwd: str = "."
@@ -449,6 +453,10 @@ class CoordinatorConfig(ProxyModel):
             out["search"] = SearchConfig(**out["search"])
         if isinstance(out.get("orbit"), dict):
             out["orbit"] = OrbitConfig(**out["orbit"])
+        if isinstance(out.get("memory"), dict):
+            out["memory"] = MemoryConfig(**out["memory"])
+        if isinstance(out.get("compression"), dict):
+            out["compression"] = CompressionConfig(**out["compression"])
         if isinstance(out.get("convergence"), dict):
             out["convergence"] = ConvergenceConfig.from_dict(out["convergence"])
         return out
@@ -515,6 +523,8 @@ class CoordinatorConfig(ProxyModel):
             llm=self.llm.model_copy(deep=True),
             timeout=self.timeout.model_copy(deep=True),
             context=self.context.model_copy(deep=True),
+            memory=self.memory.model_copy(deep=True),
+            compression=self.compression.model_copy(deep=True),
             cwd=self.cwd,
             max_turns=self.executor_max_turns,
             max_tool_concurrency=10,

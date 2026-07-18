@@ -28,6 +28,7 @@ def build_coordinator_system_prompt(config: CoordinatorConfig) -> str:
         _environment_section(config),
         _related_work_annotation_section(config),
         _ask_user_section(config),
+        _long_term_memory_section(config),
         _learned_memory_section(config),
         _reach_evidence_section(config),
     ]
@@ -579,6 +580,8 @@ trunk. It cannot affect other Executors or the trunk codebase.
 automatically injected from tree metadata. No need to repeat it.
 - Provide additional_context for: what to implement, why, which files \
 to focus on, and relevant insights from the tree.
+- For code-editing hypotheses, mention `karpathy-coding` in additional_context \
+when careful minimal implementation and verification discipline are important.
 - The Executor follows the idea's direction but uses its own engineering \
 judgment on implementation details. It will report significant choices in \
 "Implementation Choices". Review these to understand what was actually tried.
@@ -860,7 +863,7 @@ def _reach_evidence_section(config: CoordinatorConfig) -> str:
         lines.append(f"- `{tool}` on {source}{title_s}{node_s}:")
         lines.append(f"  > {excerpt}")
 
-    return "\n".join(lines)
+    return _maybe_compress_section(config, "\n".join(lines), kind="reach")
 
 
 def _learned_memory_section(config: CoordinatorConfig) -> str:
@@ -870,11 +873,49 @@ def _learned_memory_section(config: CoordinatorConfig) -> str:
 
         project_root = resolve_learning_project_root(config.cwd, config.workspace_dir)
         query = " ".join(part for part in (config.task, config.cwd) if part)
-        return build_learned_memory_section(
+        section = build_learned_memory_section(
             project_root,
             query=query,
             max_memories=5,
             max_skills=3,
         )
+        return _maybe_compress_section(config, section, kind="learned_memory")
     except Exception:
         return ""
+
+
+def _long_term_memory_section(config: CoordinatorConfig) -> str:
+    try:
+        memory = getattr(config, "memory", None)
+        if memory is None or not memory.enabled or not memory.auto_wake_up:
+            return ""
+        from ..core.learning.store import resolve_learning_project_root
+        from ..core.memory_palace.context import build_long_term_memory_section
+
+        project_root = resolve_learning_project_root(config.cwd, config.workspace_dir)
+        query = " ".join(part for part in (config.task, config.cwd) if part)
+        section = build_long_term_memory_section(
+            project_root,
+            query=query,
+            max_chars=memory.max_context_chars,
+            max_snippets=5,
+        )
+        return _maybe_compress_section(config, section, kind="memory")
+    except Exception:
+        return ""
+
+
+def _maybe_compress_section(config: CoordinatorConfig, section: str, *, kind: str) -> str:
+    try:
+        from ..core.learning.store import resolve_learning_project_root
+        from ..core.compression.prompt_context import maybe_compress_prompt_context
+
+        project_root = resolve_learning_project_root(config.cwd, config.workspace_dir)
+        return maybe_compress_prompt_context(
+            section,
+            project_root=project_root,
+            compression_config=getattr(config, "compression", None),
+            kind=kind,
+        )
+    except Exception:
+        return section

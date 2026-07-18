@@ -41,6 +41,8 @@ This repository is a maintained CLI distribution of [DevPilot](https://github.co
 - **Flexible LLM backends** — Anthropic Claude, OpenAI Responses API, Gemini (Interactions API), OpenAI-compatible gateways (DeepSeek, Qwen, vLLM, Ollama), and LiteLLM.
 - **GitLab Orbit context** — Optional Orbit Local/Remote knowledge-graph discovery before experiments run.
 - **DevPilot Learning Layer** — Project-local memories, trajectory compression, and reusable skill mining from past runs.
+- **MemPalace long-term memory** — Optional semantic recall over DevPilot sessions, Reach evidence, and learned JSONL artifacts.
+- **Headroom compression** — Optional context compression for large evidence, memory, logs, and session artifacts.
 - **Domain plugins** — Retarget evaluation rules, protected paths, and budgets with a single YAML plugin line.
 - **Agent Skill Suite** — Optional Codex / Claude Code skills for DevPilot-style workflows outside the native runtime.
 
@@ -247,6 +249,10 @@ See [GitLab Orbit](docs/orbit.md) for Local and Remote setup.
 | `devpilot config` | View or edit global configuration. |
 | `devpilot report <session>` | Re-render `REPORT.md` for a past session. |
 | `devpilot learn` | Inspect local run memories, mined skills, and compressed trajectories. |
+| `devpilot memory` | Index and search DevPilot artifacts with optional MemPalace recall. |
+| `devpilot compress` | Compress large session, evidence, log, and prompt context with optional Headroom support. |
+| `devpilot audit` | Run local iFixAi AI safety audits through DevPilot. |
+| `devpilot skills` | List and inspect built-in DevPilot prompt skills. |
 | `devpilot export <session>` | Export a session to HTML or JSONL. |
 | `devpilot version` | Print the installed version. |
 
@@ -319,6 +325,88 @@ devpilot learn trajectory compress
 
 The learning layer is inspired by self-improving agent systems like [Hermes Agent](https://github.com/NousResearch/hermes-agent), but it is implemented natively for DevPilot. Coordinator and Executor prompts receive only a small learned-memory section: at most five relevant memories and three reusable skills.
 
+## DevPilot Memory with MemPalace
+
+DevPilot can use [MemPalace](https://github.com/MemPalace/mempalace) as an optional long-term semantic memory engine. MemPalace is vendored as upstream MIT software under `vendor/mempalace`; DevPilot wraps its CLI instead of rewriting it, and core DevPilot does not require MemPalace dependencies.
+
+```bash
+git submodule update --init --recursive
+devpilot memory doctor
+devpilot memory install --dry-run
+devpilot memory init
+devpilot memory sync-evidence
+devpilot memory mine --all
+devpilot memory search "why did we change the evaluator?"
+devpilot memory wake-up
+```
+
+DevPilot keeps its own memory metadata under the active project in `.devpilot/memory/`. MemPalace indexes local exports of sessions, Reach evidence, reports, learned memories, skills, and trajectories. MemPalace stores verbatim text locally by default; external backends such as Qdrant or pgvector are opt-in and may store verbatim data outside the machine.
+
+Prompt recall is opt-in for Phase 1:
+
+```yaml
+memory:
+  provider: mempalace
+  enabled: false
+  auto_wake_up: false
+  max_context_chars: 4000
+```
+
+## DevPilot Compression with Headroom
+
+DevPilot can optionally use [Headroom](https://github.com/headroomlabs-ai/headroom) as a context-compression layer for large evidence, memory, logs, and session artifacts. Headroom is vendored as upstream Apache-2.0 software under `vendor/headroom`; DevPilot wraps it instead of rewriting it, and core DevPilot does not require Headroom dependencies.
+
+```bash
+git submodule update --init --recursive
+devpilot compress doctor
+devpilot compress install --dry-run
+devpilot compress text README.md
+devpilot compress evidence
+devpilot compress session
+devpilot compress proxy-help
+```
+
+Compression is optional and should preserve source traceability: source URLs, hypothesis IDs, failing test names, and key decisions are kept in the compressed output. Runtime prompt compression is off by default:
+
+```yaml
+compression:
+  provider: headroom
+  enabled: false
+  compress_reach_evidence: true
+  compress_memory_context: true
+  compress_test_logs: true
+  max_context_chars: 6000
+```
+
+## DevPilot Audit Layer
+
+DevPilot can run local AI safety audits through a native wrapper around the upstream [iFixAi](https://github.com/ifixai-ai/iFixAi) project. iFixAi is kept as exact upstream source under `vendor/iFixAi`; DevPilot does not modify it or store provider API keys.
+
+Phase 1 is local and explicit: audit output is written under `.devpilot/audit/`, mock runs are safe by default, and non-mock providers require confirmation plus an API key supplied through an environment variable.
+
+```bash
+devpilot audit doctor
+devpilot audit install --dry-run
+devpilot audit run --provider mock --suite smoke
+devpilot audit run --suite core
+devpilot audit setup
+devpilot audit report
+devpilot audit ifixai --help
+```
+
+The audit layer is inspired by iFixAi's diagnostic approach, but the DevPilot integration is implemented natively as a safe local CLI bridge.
+
+## Built-in Coding Discipline Skill
+
+DevPilot includes a Karpathy-inspired coding guideline skill for careful, simple, surgical, test-driven code edits.
+
+```bash
+devpilot skills list
+devpilot skills show karpathy-coding
+```
+
+The skill is adapted from [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) and packaged natively as a DevPilot skill, not as a runtime dependency.
+
 ## CLI vs. Agent Skills
 
 | | Native CLI | Agent Skill Suite |
@@ -342,6 +430,8 @@ src/                    # imported as the `devpilot` package
 ├── plugins/            # Domain plugins
 └── skills/             # On-demand markdown playbooks
 ```
+
+Optional upstream integrations are kept under `vendor/`, including Hermes Agent at `vendor/hermes-agent`, Headroom at `vendor/headroom`, and the MemPalace submodule at `vendor/mempalace`.
 
 ## Documentation
 

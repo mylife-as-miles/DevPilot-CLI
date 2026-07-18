@@ -52,24 +52,47 @@ def doctor_command() -> None:
     else:
         if running:
             _ok(f"running from {running}")
-        if path_first and (not running or Path(path_first).resolve() != running):
+        
+        same_file = False
+        if running and path_first:
+            try:
+                if hasattr(os, "samefile") and Path(path_first).exists() and running.exists():
+                    same_file = os.path.samefile(path_first, running)
+                else:
+                    p1 = str(Path(path_first).resolve()).lower()
+                    p2 = str(running).lower()
+                    if os.name == "nt":
+                        if p1.endswith(".exe"):
+                            p1 = p1[:-4]
+                        if p2.endswith(".exe"):
+                            p2 = p2[:-4]
+                    same_file = p1 == p2
+            except Exception:
+                pass
+
+        if path_first and (not running or not same_file):
             _warn(
                 f"shell finds a different `{APP_NAME}` first: {path_first}",
                 "you have two installs — uninstall the one you don't want, "
                 "or reorder your PATH",
             )
             problems += 1
-        active = str(running or path_first)
+        
+        active = str(running or path_first).replace("\\", "/")
         # Detect "trapped in a venv" — the most common failure mode the
         # user hits when they did `pip install -e .` inside a project
         # venv and now only see the command after activating it.
         if "/.venv/" in active or "/venv/" in active:
-            _warn(
-                "looks like a project-local venv install",
-                "this only works after `source .venv/bin/activate`. "
-                "Run `pipx install -e <repo>` for a global install instead.",
-            )
-            problems += 1
+            is_active = sys.prefix != sys.base_prefix or "VIRTUAL_ENV" in os.environ
+            if is_active:
+                _ok("running inside active project-local venv")
+            else:
+                _warn(
+                    "looks like a project-local venv install",
+                    "this only works after `source .venv/bin/activate`. "
+                    "Run `pipx install -e <repo>` for a global install instead.",
+                )
+                problems += 1
         elif "/pipx/" in active or "/.local/pipx/" in active:
             _ok("pipx install — works from any directory")
         elif "/.local/" in active:
