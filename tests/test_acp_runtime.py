@@ -6,6 +6,7 @@ from devpilot.acp.runtime import (
     DEVPILOT_MODES,
     AcpSession,
     build_run_invocation,
+    event_log_path,
     extract_prompt_text,
 )
 
@@ -61,6 +62,11 @@ def test_resume_uses_the_existing_run_checkpoint(tmp_path: Path) -> None:
     )
     invocation = build_run_invocation(session, "Continue")
     assert "--resume" in invocation
+
+
+def test_event_log_path_matches_the_cli_run_workspace(tmp_path: Path) -> None:
+    session = AcpSession(session_id="session-4", cwd=tmp_path, run_name="acp-session-4")
+    assert event_log_path(session) == tmp_path / ".devpilot" / "sessions" / "acp-session-4" / "events.jsonl"
 
 
 def test_prompt_extraction_accepts_only_text_blocks() -> None:

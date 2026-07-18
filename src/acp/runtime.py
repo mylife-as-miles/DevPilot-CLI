@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, NamedTuple
 
+from .._app import CONFIG_DIR_NAME
+
 
 class DevPilotMode(NamedTuple):
     id: str
@@ -97,3 +99,8 @@ def build_run_invocation(session: AcpSession, prompt: str) -> tuple[str, ...]:
     if session.has_started:
         args.append("--resume")
     return tuple(args)
+
+
+def event_log_path(session: AcpSession) -> Path:
+    """Return the durable event log owned by the corresponding CLI run."""
+    return session.cwd / CONFIG_DIR_NAME / "sessions" / session.run_name / "events.jsonl"

@@ -45,7 +45,15 @@ from acp.schema import (
     SetSessionModeResponse,
 )
 
-from .runtime import AcpSession, DEVPILOT_MODES, MODE_IDS, build_run_invocation, extract_prompt_text
+from .events import AcpEventMapper, read_appended_events
+from .runtime import (
+    AcpSession,
+    DEVPILOT_MODES,
+    MODE_IDS,
+    build_run_invocation,
+    event_log_path,
+    extract_prompt_text,
+)
 from .store import AcpSessionStore
 
 
@@ -65,6 +73,7 @@ class DevPilotAcpAgent(Agent):
         self._sessions: dict[str, AcpSession] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._cancelled: set[str] = set()
+        self._event_mappers: dict[str, AcpEventMapper] = {}
 
     def on_connect(self, conn: Client) -> None:
         self._client = conn
@@ -214,6 +223,11 @@ class DevPilotAcpAgent(Agent):
         async with lock:
             self._cancelled.discard(session_id)
             invocation = build_run_invocation(session, message)
+            events_path = event_log_path(session)
+            try:
+                event_offset = events_path.stat().st_size
+            except OSError:
+                event_offset = 0
             process_group_options = (
                 {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
                 if sys.platform == "win32"
@@ -225,10 +239,14 @@ class DevPilotAcpAgent(Agent):
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, "NO_COLOR": "1", "TERM": "dumb"},
                 **process_group_options,
             )
             session.process = process
             stderr_task = asyncio.create_task(self._forward_stderr(process))
+            event_task = asyncio.create_task(
+                self._forward_events(process, session_id, events_path, event_offset)
+            )
             try:
                 assert process.stdout is not None
                 while True:
@@ -240,6 +258,7 @@ class DevPilotAcpAgent(Agent):
                         await self._send_text_update(session_id, line)
                 return_code = await process.wait()
                 await stderr_task
+                await event_task
             finally:
                 session.process = None
 
@@ -281,6 +300,7 @@ class DevPilotAcpAgent(Agent):
         await self.cancel(session_id, **kwargs)
         self._sessions.pop(session_id, None)
         self._locks.pop(session_id, None)
+        self._event_mappers.pop(session_id, None)
         return CloseSessionResponse()
 
     async def _send_text_update(self, session_id: str, text: str) -> None:
@@ -291,6 +311,33 @@ class DevPilotAcpAgent(Agent):
             update=update_agent_message(text_block(f"{text}\n")),
             source="devpilot",
         )
+
+    async def _forward_events(
+        self,
+        process: asyncio.subprocess.Process,
+        session_id: str,
+        path: Path,
+        offset: int,
+    ) -> None:
+        mapper = self._event_mappers.setdefault(session_id, AcpEventMapper(session_id))
+        empty_after_exit = 0
+        while True:
+            events, offset = read_appended_events(path, offset)
+            for event in events:
+                if self._client is None:
+                    continue
+                for update in mapper.updates(event):
+                    await self._client.session_update(
+                        session_id=session_id,
+                        update=update,
+                        source="devpilot",
+                    )
+
+            if process.returncode is not None:
+                empty_after_exit = 0 if events else empty_after_exit + 1
+                if empty_after_exit >= 2:
+                    return
+            await asyncio.sleep(0.05)
 
     @staticmethod
     async def _forward_stderr(process: asyncio.subprocess.Process) -> None:
