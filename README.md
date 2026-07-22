@@ -7,6 +7,7 @@ This project was prepared for OpenAI Build Week in the **Developer Tools** categ
 ## Links
 
 - Repository: https://github.com/mylife-as-miles/DevPilot-CLI
+- Electron app: https://github.com/mylife-as-miles/DevPilot
 - Landing page: https://devpilot-cli-landing.myles4miles.chatgpt.site
 - Package name: `miles-devpilot-cli`
 - License: Apache-2.0
@@ -46,6 +47,12 @@ Codex and GPT-5.6 were used to accelerate the Build Week work in several concret
 - Generated a small Devpost-ready project zip under the 35 MB limit.
 
 Codex was especially useful for repository-wide edits: following CLI command registration, preserving existing Typer command patterns, adding tests around local JSONL storage, and verifying build or packaging outputs.
+
+## Related DevPilot App
+
+The companion Electron app lives at https://github.com/mylife-as-miles/DevPilot. That repository contains the local desktop control plane for DevPilot, including the Electron shell in `apps/desktop` and the UI source in `apps/ui`.
+
+This CLI repository is the command-line runtime and judge-testable developer tool. The Build Week landing page intentionally references the Electron app's onboarding direction, brand language, and desktop control-plane concept while keeping the CLI install and testing path separate.
 
 ## Core Features
 
@@ -221,6 +228,8 @@ examples/               small benchmark examples
 sites/devpilot-cli-landing/
                         Build Week landing page source
 ```
+
+The companion Electron app source is maintained in the separate `mylife-as-miles/DevPilot` repository, not vendored into this CLI package.
 
 ## What To Look At In The Code
 
